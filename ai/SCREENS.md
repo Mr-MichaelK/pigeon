@@ -124,3 +124,36 @@
 * **Device Node Name:** A technical read-only or semi-editable field (e.g., `NODE-ALPHA-X`) that maps to the `creatorDeviceId`.
 
 ---
+
+### Part 5: "Joining the Mesh" (Onboarding)
+
+#### **1. Identity & Node Setup (The "Digital Signature")**
+
+* **Logic:** This is a **one-time** screen displayed only if no local profile exists in the Room DB.
+* **Fields:**
+* **Display Name / Callsign:** Text field for public identification.
+* **Device Nickname:** Used for BLE/Wi-Fi Direct discovery (e.g., "Pigeon-Node-01").
+* **Anonymous Mode Toggle:** Instantly clears the name fields and sets the identity to `Anonymous Civilian`.
+
+
+* **Privacy Disclaimer:** A high-visibility "Rugged-style" warning box: *"Your role and callsign will be permanently attached to every event you broadcast. This cannot be undone once synced with the mesh."*
+
+#### **2. Tactical Role Selection**
+
+* **Layout:** A grid of high-contrast "Role Cards."
+* **Roles & Visual Tokens:**
+* **Civilian:** Slate Grey / Default Icon.
+* **Medic/Doctor:** Soft Red / Cross Icon.
+* **Fire/Rescue:** Orange / Flame Icon.
+* **Utility/Tech:** Blue / Wrench Icon.
+
+
+* **Smart Defaults:** If no selection is made within the "Speed to Map" threshold, default to **Civilian**.
+
+#### **3. The "Finish" Action**
+
+* **Button Label:** `JOIN THE MESH`
+* **Feedback:** Upon clicking, the app should show a brief "Generating Node Keys..." animation to emphasize the security/local-first nature of the identity.
+* **Offline Indicator:** A footer note: *"No Internet Required. Local Storage Only."*
+
+---
