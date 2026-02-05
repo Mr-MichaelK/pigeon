@@ -40,12 +40,6 @@
 
 ---
 
-That simplifies the logic significantly. By removing "Urgent" and "Critical" tags, we lean fully into the **Information-Oriented** philosophy where every piece of data is treated with equal transport priority, leaving the "importance" to the user's manual filtering.
-
-Regarding the `creatorDeviceId`, while it’s a hash, it's useful for "following" reports from a specific known entity (like a local medic or scout).
-
----
-
 ### Part 2: The Event History Log (Refined)
 
 #### **1. Centralized Event Ledger**
@@ -76,12 +70,6 @@ Regarding the `creatorDeviceId`, while it’s a hash, it's useful for "following
 
 ---
 
-To provide your agents with a complete technical "vision," I have synthesized your latest instructions and screenshots into the final section of the `ai/SCREENS.md` file.
-
-This document uses precise Android development terminology (RADAR view drawing, State management, RSSI indicators) so the **Architect** and **Coder** agents know exactly how to implement the logic.
-
----
-
 ### Part 3: Peer Discovery & Connectivity
 
 #### **1. Mesh Radar & State Control**
@@ -106,5 +94,33 @@ This document uses precise Android development terminology (RADAR view drawing, 
 
 
 * **Sync History (Last 24h):** * A grayed-out "History" section showing peers that are no longer in range but with whom a successful Set Union sync was completed recently.
+
+---
+
+### Part 4: Profile Configuration & Trust Identity
+
+#### **1. Identity Profile Header**
+
+* **User Avatar:** A large, circular placeholder for the user's local avatar.
+* **Verified Status:** A "Verified Node" badge (green checkmark) that appears if the device has participated in a threshold number of successful syncs.
+* **Identity Summary:** Displays the current `Display Name` and `Role` prominently.
+
+#### **2. The 72-Hour Identity Lock**
+
+* **Logic:** * To maintain network trust and prevent malicious actors from spoofing multiple identities, any change to the Profile data triggers a **72-hour lockout**.
+* The UI must display a `PROFILE LOCK` information box explaining this constraint.
+
+
+* **The Countdown Timer:** * When a user attempts to edit, a "Confirmation Modal" appears (as seen in Screenshot 6).
+* It features a live countdown timer (e.g., `71:59:58`) and a warning that this identity will be "locked" across the emergency mesh.
+* **Action:** "Save & Lock Identity" button.
+
+
+
+#### **3. Form Fields**
+
+* **Display Name:** A text input for the user's public-facing handle (e.g., "Alpha-One").
+* **Operational Role:** A dropdown/spinner to select their primary function (e.g., Lead Medic, Scout, Logistics, Civilian).
+* **Device Node Name:** A technical read-only or semi-editable field (e.g., `NODE-ALPHA-X`) that maps to the `creatorDeviceId`.
 
 ---
