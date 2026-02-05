@@ -75,3 +75,36 @@ Regarding the `creatorDeviceId`, while it’s a hash, it's useful for "following
 * **Sync Status:** Replace "Force Sync" with a **Mesh Pulse** indicator. It pulses green when the device enters its **1-minute Active Window** to exchange deltas.
 
 ---
+
+To provide your agents with a complete technical "vision," I have synthesized your latest instructions and screenshots into the final section of the `ai/SCREENS.md` file.
+
+This document uses precise Android development terminology (RADAR view drawing, State management, RSSI indicators) so the **Architect** and **Coder** agents know exactly how to implement the logic.
+
+---
+
+### Part 3: Peer Discovery & Connectivity
+
+#### **1. Mesh Radar & State Control**
+
+* **Power State Toggle:** A prominent 3-way segmented control at the top:
+* **OFF:** Disables all Nearby Connections radios (Scanning & Advertising).
+* **PASSIVE:** BLE Advertising/Listening only (Synchronizes via small BYTES payloads).
+* **ACTIVE:** Full P2P Cluster mode (Wi-Fi Direct enabled for high-speed delta transfers).
+
+
+* **Visual Radar:** * A custom-drawn circular canvas centered on the user.
+* **Logic:** Dynamically renders icons for discovered peers. Distance from the center is determined by the **RSSI (Signal Strength)**.
+* **Interaction:** Tapping a peer icon on the radar triggers a manual **Ping** (Handshake) to initiate an opportunistic sync.
+
+
+
+#### **2. Peer List Management**
+
+* **Active Peers (Live):** * A list of devices currently within radio range.
+* **Metadata:** Display peer `Callsign`, connection type (BLE vs. Wi-Fi), and a real-time signal strength meter.
+* **Sync Progress:** If a Delta transfer is occurring, show a linear progress bar (e.g., "Syncing Manifest.db... 64%").
+
+
+* **Sync History (Last 24h):** * A grayed-out "History" section showing peers that are no longer in range but with whom a successful Set Union sync was completed recently.
+
+---
