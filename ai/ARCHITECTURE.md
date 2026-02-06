@@ -19,11 +19,13 @@ Pigeon is built on the **Epidemic Broadcast Model**. [cite_start]Unlike chat app
 3. **ACTIVE:** Wi-Fi Direct Discovery/Transfer (High Power). Used for large `FILE` delta transfers.
 
 ## [cite_start]4. The "Ping" Synchronization Flow 
-1. **Discovery:** An "Active" device pings a "Passive" device via BLE.
-2. **Wake-up:** The Passive device wakes into the "Active" state for exactly **1 minute**.
-3. **Handshake:** Devices exchange a list of missing Event IDs (Deltas).
-4. **Transfer:** Data is exchanged. If the delta > 32KB, it upgrades to a Wi-Fi Direct `FILE` payload to "Race to Sleep."
-5. **Sleep:** Devices return to Passive/Off to conserve energy.
+1. **Trigger:** A "Ping" is initiated automatically in two scenarios:
+    * Proactive: When a user creates a new Event (immediate broadcast).
+    * Opportunistic: Periodic background scanning based on the device's Power State.
+2. **Discovery:** The Active device identifies Passive devices via BLE.
+3. **Wake-up:** Passive devices receive the "Wake-up" frame and transition to **Active** for **1 minute**.
+4. **Handshake & Transfer:** Set Union delta exchange occurs (Upgrading to Wi-Fi Direct if payload > 32KB).
+5. **Sleep:** Devices return to Passive/Off.
 
 ## 5. Data Integrity & Lifecycle
 * **Immutability:** Once an event is created, its core data (ID, Type, Lat/Long) is final. Updates are appended as new linked events.

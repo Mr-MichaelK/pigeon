@@ -81,8 +81,8 @@
 
 
 * **Visual Radar:** * A custom-drawn circular canvas centered on the user.
-* **Logic:** Dynamically renders icons for discovered peers. Distance from the center is determined by the **RSSI (Signal Strength)**.
-* **Interaction:** Tapping a peer icon on the radar triggers a manual **Ping** (Handshake) to initiate an opportunistic sync.
+* **Logic:** Peer discovery remains constant, but the "Ping" (transition to Active) is now a background broadcast triggered automatically whenever the user submits a report via the **Reporting Wizard**.
+* **Interaction:** The radar is **Read-Only**. Tapping icons is disabled.
 
 
 
