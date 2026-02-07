@@ -11,6 +11,7 @@ import com.example.pigeon.domain.model.User
 data class UserEntity(
     @PrimaryKey val id: Int = 1,
     val displayName: String,
+    val gender: String,
     val role: String,
     val nodeName: String,
     val isAnonymous: Boolean,
@@ -20,6 +21,7 @@ data class UserEntity(
 fun UserEntity.toDomain(): User = User(
     id = id,
     displayName = displayName,
+    gender = gender,
     role = role,
     nodeName = nodeName,
     isAnonymous = isAnonymous,
@@ -29,6 +31,7 @@ fun UserEntity.toDomain(): User = User(
 fun User.toEntity(): UserEntity = UserEntity(
     id = id,
     displayName = displayName,
+    gender = gender,
     role = role,
     nodeName = nodeName,
     isAnonymous = isAnonymous,

@@ -1,76 +1,74 @@
-# Implementation Plan - Task 1.1: Local Persistence (User Identity)
+# Implementation Plan - Task 1.2: Tactical Onboarding & Identity Lock
 
-This plan outlines the architecture for local user identity persistence using Room, Hilt, and Clean Architecture patterns.
+This plan outlines the architecture for the onboarding flow and identity management UI using Jetpack Compose and Navigation.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> A **72-hour lock** logic is required for profile updates. We will store a `lastUpdatedTimestamp` in the `UserEntity` to facilitate this check in the UI layer.
+> A **72-hour lock** countdown will be implemented in the Profile screen. This logic depends on the `lastUpdatedTimestamp` stored in `UserEntity` (implemented in Task 1.1).
 
 ## Proposed Changes
 
 ### Build Configuration
 
 #### [MODIFY] [libs.versions.toml](file:///Users/michael/AndroidStudioProjects/pigeon/gradle/libs.versions.toml)
-- Add Room, Hilt, and KSP versions and libraries.
-
-#### [MODIFY] [build.gradle.kts (Project)](file:///Users/michael/AndroidStudioProjects/pigeon/build.gradle.kts)
-- Add Hilt and KSP plugins to the top-level build file.
+- Add Compose BOM, Navigation, and Hilt Navigation versions and libraries.
 
 #### [MODIFY] [app/build.gradle.kts](file:///Users/michael/AndroidStudioProjects/pigeon/app/build.gradle.kts)
-- Apply Hilt and KSP plugins.
-- Add Room, Hilt, and Lifecycle dependencies.
+- Enable Compose `buildFeatures`.
+- Add Compose and Navigation dependencies.
 
 ---
 
-### Data Layer
+### UI Layer (Compose)
 
-#### [NEW] [UserEntity.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/data/local/entities/UserEntity.kt)
-- Define `UserEntity` with:
-    - `id`: Int (1 as PK)
-    - `displayName`: String
-    - `role`: String
-    - `nodeName`: String (Immutable, auto-generated hash)
-    - `isAnonymous`: Boolean
-    - `lastUpdatedTimestamp`: Long
+#### [NEW] [NavGraph.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/ui/navigation/NavGraph.kt)
+- Define navigation routes: `Onboarding`, `Map`, `Profile`.
+- Implement conditional `startDestination` logic based on user existence.
 
-#### [NEW] [UserDao.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/data/local/dao/UserDao.kt)
-- Define Room DAO for `UserEntity` with `upsert` and `get` operations.
+#### [NEW] [OnboardingScreen.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/ui/screens/onboarding/OnboardingScreen.kt)
+- "Joining the Mesh" UI (Part 5):
+    - Display Name input.
+    - Gender Selection toggle (Male/Female).
+    - Anonymous Mode toggle.
+    - Tactical Role Selection grid (Grid of Role Cards).
+    - "JOIN THE MESH" button with animation.
 
-#### [NEW] [PigeonDatabase.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/data/local/PigeonDatabase.kt)
-- Define the main Room database class.
+#### [NEW] [ProfileScreen.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/ui/screens/profile/ProfileScreen.kt)
+- "Identity Profile" UI (Part 4):
+    - Profile Header (Avatar based on gender, Verified Badge).
+    - 72-Hour Lock Countdown Timer.
+    - Editable fields (Name, Role, Gender).
+    - "Save & Lock Identity" confirmation modal.
 
-#### [NEW] [LocalUserRepository.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/data/repository/local/LocalUserRepository.kt)
-- Implementation of the repository interface using `UserDao`.
+#### [NEW] [OnboardingViewModel.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/ui/screens/onboarding/OnboardingViewModel.kt)
+- Business logic for onboarding:
+    - Checking if profile exists.
+    - Saving new user profile.
+    - Generating the initial "Node Key" animation state.
+
+#### [NEW] [ProfileViewModel.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/ui/screens/profile/ProfileViewModel.kt)
+- Business logic for profile management:
+    - Loading user profile.
+    - Calculating countdown timer.
+    - Handling identity lock confirmation.
 
 ---
 
-### Domain Layer
+### Theme & Styling
 
-#### [NEW] [User.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/domain/model/User.kt)
-- Domain model for the user profile.
-
-#### [NEW] [UserRepository.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/domain/repository/UserRepository.kt)
-- Interface definition for user data operations.
-
----
-
-### Dependency Injection
-
-#### [NEW] [DatabaseModule.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/di/DatabaseModule.kt)
-- Hilt module to provide Room database and DAOs.
-
-#### [NEW] [RepositoryModule.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/di/RepositoryModule.kt)
-- Hilt module to bind `UserRepository` to `LocalUserRepository`.
-
-#### [NEW] [PigeonApplication.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/PigeonApplication.kt)
-- Application class annotated with `@HiltAndroidApp`.
+#### [NEW] [PigeonTheme.kt](file:///Users/michael/AndroidStudioProjects/pigeon/app/src/main/java/com/example/pigeon/ui/theme/Theme.kt)
+- Implement `STYLE_GUIDE.md` specifications:
+    - Colors: #1C1C1C (Background), #E57373 (Primary), #81C784 (Secondary).
+    - Shape: 8dp rugged corners.
 
 ## Verification Plan
 
 ### Automated Tests
-- Create `UserDaoTest` to verify Room operations.
-- Run using: `./gradlew test` (Unit tests for Room if using an in-memory database) or `./gradlew connectedAndroidTest`.
+- N/A for UI components (Manual verification preferred for "Look & Feel").
+- Unit test `ProfileViewModel` for countdown logic.
 
 ### Manual Verification
-- N/A for this task as it's purely data layer. Verification will be done via unit tests and integration in Task 1.2.
+- **Scenario 1: Fresh Install**: App starts on "Joining the Mesh". Roles selected, user joined, transitions to Map.
+- **Scenario 2: Return User**: App starts directly on Map.
+- **Scenario 3: Identity Change**: Try editing profile. Confirm lockout warning. Verify countdown timer appears.

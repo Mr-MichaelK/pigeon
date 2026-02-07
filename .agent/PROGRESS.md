@@ -16,9 +16,9 @@
 - [x] **Reviewer:** Verify data models match the "Trust Identity" requirements in `SCREENS.md`.
 
 ### Task 1.2: Tactical Onboarding & Identity Lock
-- [ ] **Architect:** Plan the conditional Start Destination (Onboarding vs. Map).
-- [ ] **Coder:** Build the "Joining the Mesh" screen and the Profile screen with the 72-hour countdown timer.
-- [ ] **Reviewer:** Audit UI for "Rugged/Utility" aesthetic and check "Anonymous Mode" logic.
+- [x] **Architect:** Plan the conditional Start Destination (Onboarding vs. Map).
+- [x] **Coder:** Build the "Joining the Mesh" screen and the Profile screen with the 72-hour countdown timer.
+- [x] **Reviewer:** Audit UI for "Rugged/Utility" aesthetic and check "Anonymous Mode" logic.
 
 ## 🟡 PHASE 2: Spatial Awareness (Mock Data)
 ### Task 2.1: MapLibre Integration

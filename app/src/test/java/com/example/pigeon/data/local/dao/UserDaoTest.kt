@@ -41,6 +41,7 @@ class UserDaoTest {
     fun upsertAndGetUser() = runBlocking {
         val user = UserEntity(
             displayName = "Alpha-One",
+            gender = "Male",
             role = "Lead Medic",
             nodeName = "NODE-12345678",
             isAnonymous = false,
@@ -59,6 +60,7 @@ class UserDaoTest {
     fun getUserSyncReturnsCorrectUser() = runBlocking {
         val user = UserEntity(
             displayName = "Alpha-One",
+            gender = "Male",
             role = "Lead Medic",
             nodeName = "NODE-12345678",
             isAnonymous = false,
