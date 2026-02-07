@@ -11,9 +11,9 @@
 
 ## 🟡 PHASE 1: Identity & Gateway (IN PROGRESS)
 ### Task 1.1: Local Persistence (User Identity)
-- [ ] **Architect:** Define Room Entity for User Profile including the 72-hour lock timestamp.
-- [ ] **Coder:** Implement Room database setup and LocalUserRepository.
-- [ ] **Reviewer:** Verify data models match the "Trust Identity" requirements in `SCREENS.md`.
+- [x] **Architect:** Define Room Entity for User Profile including the 72-hour lock timestamp.
+- [x] **Coder:** Implement Room database setup and LocalUserRepository.
+- [x] **Reviewer:** Verify data models match the "Trust Identity" requirements in `SCREENS.md`.
 
 ### Task 1.2: Tactical Onboarding & Identity Lock
 - [ ] **Architect:** Plan the conditional Start Destination (Onboarding vs. Map).
