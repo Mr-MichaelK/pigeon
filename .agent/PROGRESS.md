@@ -20,6 +20,18 @@
 - [x] **Coder:** Build the "Joining the Mesh" screen and the Profile screen with the 72-hour countdown timer.
 - [x] **Reviewer:** Audit UI for "Rugged/Utility" aesthetic and check "Anonymous Mode" logic.
 
+### Task 1.3: Stich UI Refinement
+- [ ] **Coder:** Refine the Onboarding and Identity UI to match the "Stich" design reference.
+- [ ] **Reviewer:** Verify adherence to Pigeon Visual Standards and Stich aesthetics.
+
+### Task 1.4: Core Screen Skeleton
+- [x] **Coder:** Create placeholder screens for Map, Event Log, and Radar.
+- [x] **Architect:** Define navigation logic and individual screen view states.
+
+### Task 1.5: Navigation Architecture
+- [x] **Coder:** Implement the Bottom Navigation Bar and the flow between core screens.
+- [x] **Reviewer:** Ensure smooth transitions and correct backstack handling.
+
 ## 🟡 PHASE 2: Spatial Awareness (Mock Data)
 ### Task 2.1: MapLibre Integration
 - [ ] **Architect:** Design the MapView container and a mock Tile Provider (using Lebanon region).
