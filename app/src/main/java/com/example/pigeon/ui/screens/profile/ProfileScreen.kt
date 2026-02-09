@@ -33,7 +33,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(StichColor.Background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -42,14 +42,15 @@ fun ProfileScreen(
         Text(
             text = "IDENTITY PROFILE",
             style = MaterialTheme.typography.headlineMedium,
-            color = PrimaryRed,
+            color = StichColor.TextPrimary,
+            fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp
         )
         
         Spacer(modifier = Modifier.height(32.dp))
         
         if (uiState.isLoading) {
-            CircularProgressIndicator(color = TacticalGreen)
+            CircularProgressIndicator(color = StichColor.Primary)
         } else {
             uiState.user?.let { user ->
                 ProfileHeader(user)
@@ -74,11 +75,15 @@ fun ProfileScreen(
                         .height(56.dp),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = DarkSurface,
+                        containerColor = StichColor.Primary,
                         contentColor = Color.White
                     )
                 ) {
-                    Text("RETURN TO MAP")
+                    Text(
+                        text = "RETURN TO MAP",
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
         }
@@ -95,8 +100,8 @@ fun ProfileHeader(user: User) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = CircleShape,
-            color = if (user.gender == "Male") Color(0xFF1976D2) else Color(0xFFC2185B),
-            border = androidx.compose.foundation.BorderStroke(2.dp, TacticalGreen)
+            color = if (user.gender == "Male") Color(0xFFE0C09E) else Color(0xFFD1B08E),
+            border = androidx.compose.foundation.BorderStroke(2.dp, StichColor.Primary)
         ) {
             Icon(
                 imageVector = Icons.Default.Person,
@@ -110,12 +115,13 @@ fun ProfileHeader(user: User) {
         Surface(
             modifier = Modifier.size(32.dp),
             shape = CircleShape,
-            color = DarkBackground
+            color = StichColor.Surface,
+            tonalElevation = 2.dp
         ) {
             Icon(
                 imageVector = Icons.Default.Verified,
                 contentDescription = "Verified",
-                tint = TacticalGreen,
+                tint = StichColor.SuccessGreen,
                 modifier = Modifier.padding(2.dp)
             )
         }
@@ -126,14 +132,15 @@ fun ProfileHeader(user: User) {
     Text(
         text = user.displayName,
         style = MaterialTheme.typography.headlineSmall,
-        color = Color.White,
+        color = StichColor.TextPrimary,
         fontWeight = FontWeight.Bold
     )
     
     Text(
         text = user.nodeName,
         style = MaterialTheme.typography.bodySmall,
-        color = TacticalGreen,
+        color = StichColor.Primary,
+        fontWeight = FontWeight.Medium,
         letterSpacing = 1.sp
     )
 }
@@ -142,43 +149,48 @@ fun ProfileHeader(user: User) {
 fun CountdownCard(countdownText: String, isLocked: Boolean) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = DarkSurface,
-        shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isLocked) EmergencyRed else TacticalGreen)
+        color = StichColor.Surface,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, StichColor.Primary.copy(alpha = 0.5f))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.Verified,
                     contentDescription = null,
-                    tint = if (isLocked) EmergencyRed else TacticalGreen,
-                    modifier = Modifier.size(18.dp)
+                    tint = if (isLocked) StichColor.Primary else StichColor.SuccessGreen,
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isLocked) "IDENTITY LOCKED" else "IDENTITY STABLE",
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isLocked) EmergencyRed else TacticalGreen
+                    color = if (isLocked) StichColor.Primary else StichColor.SuccessGreen,
+                    fontWeight = FontWeight.Bold
                 )
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             Text(
                 text = countdownText,
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold
+                style = MaterialTheme.typography.headlineLarge,
+                color = StichColor.TextPrimary,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
             )
+            
+            Spacer(modifier = Modifier.height(4.dp))
             
             Text(
                 text = "REMAINING UNTIL RE-BROADCAST PERMITTED",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                fontSize = 10.sp
+                color = StichColor.TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -186,31 +198,47 @@ fun CountdownCard(countdownText: String, isLocked: Boolean) {
 
 @Composable
 fun IdentityDetails(user: User) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        DetailRow(label = "TACTICAL ROLE", value = user.role.uppercase())
-        DetailRow(label = "GENDER", value = user.gender.uppercase())
-        DetailRow(label = "ANONYMOUS MODE", value = if (user.isAnonymous) "ENABLED" else "DISABLED")
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(StichColor.Surface, RoundedCornerShape(12.dp))
+            .border(1.dp, StichColor.Border, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        DetailRow(label = "TACTICAL ROLE", value = user.role.uppercase(), isLast = false)
+        DetailRow(label = "GENDER", value = user.gender.uppercase(), isLast = false)
+        DetailRow(label = "ANONYMOUS MODE", value = if (user.isAnonymous) "ENABLED" else "DISABLED", isLast = true)
     }
 }
 
 @Composable
-fun DetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
+fun DetailRow(label: String, value: String, isLast: Boolean) {
+    val modifier = if (!isLast) {
+        Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
-            .border(bottom = 1.dp, color = DarkSurface),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .border(bottom = 1.dp, color = StichColor.Border)
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = Color.Gray
+            color = StichColor.TextSecondary,
+            fontWeight = FontWeight.Medium
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
+            color = StichColor.TextPrimary,
             fontWeight = FontWeight.SemiBold
         )
     }
