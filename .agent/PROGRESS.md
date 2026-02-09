@@ -21,8 +21,8 @@
 - [x] **Reviewer:** Audit UI for "Rugged/Utility" aesthetic and check "Anonymous Mode" logic.
 
 ### Task 1.3: Stich UI Refinement
-- [ ] **Coder:** Refine the Onboarding and Identity UI to match the "Stich" design reference.
-- [ ] **Reviewer:** Verify adherence to Pigeon Visual Standards and Stich aesthetics.
+- [x] **Coder:** Refine the Onboarding and Identity UI to match the "Stich" design reference.
+- [x] **Reviewer:** Verify adherence to Pigeon Visual Standards and Stich aesthetics.
 
 ### Task 1.4: Core Screen Skeleton
 - [x] **Coder:** Create placeholder screens for Map, Event Log, and Radar.
@@ -39,18 +39,20 @@
 - [ ] **Reviewer:** Ensure map components are optimized for offline-default rendering.
 
 ### Task 2.2: The Event Ledger (Mocked)
-- [ ] **Architect:** Define the `Event` Room Entity (Immutable) and a `MockDataGenerator`.
-- [ ] **Coder:** Implement the Event Log Screen and the Map Event Pins using static mock events.
-- [ ] **Reviewer:** Confirm the "Timeline Rail" in the Log screen matches the UX spec.
+- [x] **Architect:** Define the `Event` Room Entity (Immutable) and a `MockDataGenerator`.
+- [x] **Coder:** Implement the Event Log Screen and the Map Event Pins using static mock events.
+- [x] **Reviewer:** Confirm the "Timeline Rail" in the Log screen matches the UX spec.
 
 ### Task 2.3: Multi-Step Reporting Wizard
 - [ ] **Architect:** Design the state machine for the 3-step reporting flow.
 - [ ] **Coder:** Build the Reporting Bottom Sheet. Note: Broadcast action should only update local DB for now.
 - [ ] **Reviewer:** Test "Two-Tap" efficiency for reporting under stress.
 
-## ⚪ PHASE 3: Peer Discovery UI (Radar Only)
-- [ ] **Architect:** Design the Radar Canvas logic using RSSI distance math.
-- [ ] **Coder:** Implement the Visual Radar and Peer List with placeholder "Nearby Peers."
+## 🟢 PHASE 3: Peer Discovery UI (Radar Only) (COMPLETED)
+### Task 3.1: Visual Radar & Peer Discovery
+- [x] **Architect:** Design the Radar Canvas logic using RSSI distance math.
+- [x] **Coder:** Implement the Visual Radar and Peer List with placeholder "Nearby Peers."
+- [x] **Reviewer:** Audit Radio Hygiene (OFF state) and Canvas performance.
 
 ## 🔴 PHASE 4: Networking & Real-Time Sync (FUTURE)
 - [ ] Implement Google Nearby Connections wrapper.

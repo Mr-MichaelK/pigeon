@@ -1,24 +1,22 @@
-# PLAN: Task 2.1 & 2.2 - The Event Ledger & Mock Data
+# PLAN: Task 3.1 - Mesh Radar & Peer Discovery UI
 
-## 1. Domain & Data Layer
-* **Entity:** Create `EventEntity.kt` in the `data` layer. 
-    * Fields: `eventId` (UUID), `creatorDeviceId` (String), `eventType` (Enum), `title` (String), `description` (String), `latitude/longitude` (Double), `timestamp` (Long), `isResolved` (Boolean), `ttl` (Long).
-* **DAO:** Implement `EventDao.kt` with queries for:
-    * `getAllEvents()` (Flow)
-    * `getNearbyEvents(lat, lon, radius)`
-    * `searchEvents(query)`
-* **Repository:** `EventRepository.kt` and `EventRepositoryImpl.kt` to handle data fetching.
-* **Mock Data:** Create `MockDataGenerator.kt` to populate the DB with 10-15 sample events located in the Lebanon region.
+## 1. Domain & State Management
+* **State Logic:** Define an Enum `MeshPowerState` { OFF, PASSIVE, ACTIVE }.
+* **Peer Model:** Create `Peer.kt` data class.
+    * Fields: `deviceId`, `callsign`, `connectionType` (BLE/Wi-Fi), `rssi` (Signal Strength), `syncProgress` (0-100), `lastSeen` (Long).
+* **ViewModel:** `RadarViewModel.kt` to expose a `StateFlow<List<Peer>>` and handle the transition logic between power states.
 
 ## 2. UI Layer (Compose)
-* **Screen:** `EventLogScreen.kt`.
-* **Components:**
-    * **Timeline Rail:** A vertical line UI element connecting list items to represent the flow of time.
-    * **Filter Row:** `FilterChip` components for "All", "Unresolved", "Resolved", and "Nearby".
-    * **Search Bar:** A top-anchored search bar for text, type, and device ID queries.
-    * **Event Card:** High-contrast cards matching "Stich" aesthetics (#F8F7F6 background, 12dp corners).
-* **ViewModel:** `EventLogViewModel.kt` to manage UI State (Loading, Success, Empty) and filtering logic.
+* **3-Way Toggle:** A segmented control at the top to switch between OFF, PASSIVE, and ACTIVE modes.
+* **Radar Canvas:** A custom `Canvas` component.
+    * Use `drawCircle` for the radar rings.
+    * Map `Peer` RSSI values to distance from the center.
+    * Render peers as small icons; ensure they are **Read-Only** (no click listeners).
+* **Peer List:** A `LazyColumn` below the radar.
+    * **Live Peers:** Show callsign, signal meter, and a linear progress bar if a sync is active.
+    * **History:** A grayed-out section for peers synced in the last 24h.
 
-## 3. Logic Patterns
-* **Mesh Pulse:** Implement a small UI indicator in the header that "pulses" green to simulate a sync window.
-* **Immutability:** Ensure the UI only displays data and triggers a "Resolve" action by creating a new status update (not editing the original event).
+## 3. Visual & Technical Constraints
+* **Aesthetic:** Background #F8F7F6, Primary Gold #DF9C20 for active states.
+* **Battery Efficiency:** The Radar Canvas must use `remember` for drawing paths to avoid unnecessary recompositions during animation.
+* **Sync Pulse:** The "Mesh Pulse" indicator should pulse green when the device is in its 1-minute Active Window.
