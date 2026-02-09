@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.pigeon.data.local.PigeonDatabase
 import com.example.pigeon.data.local.dao.UserDao
+import com.example.pigeon.data.local.dao.EventDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,11 +28,17 @@ object DatabaseModule {
             context,
             PigeonDatabase::class.java,
             "pigeon_ledger.db"
-        ).build()
+        ).fallbackToDestructiveMigration()
+         .build()
     }
 
     @Provides
     fun provideUserDao(db: PigeonDatabase): UserDao {
         return db.userDao()
+    }
+
+    @Provides
+    fun provideEventDao(db: PigeonDatabase): EventDao {
+        return db.eventDao()
     }
 }

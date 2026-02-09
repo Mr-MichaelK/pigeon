@@ -76,10 +76,11 @@ fun PigeonNavGraph(
                     )
                 }
                 composable(Screen.Radar.route) {
-                    com.example.pigeon.ui.screens.radar.RadarPlaceholderScreen()
+                    com.example.pigeon.ui.screens.radar.RadarScreen()
                 }
                 composable(Screen.Log.route) {
-                    com.example.pigeon.ui.screens.log.LogPlaceholderScreen()
+                    val viewModel: com.example.pigeon.ui.screens.log.EventLogViewModel = hiltViewModel()
+                    com.example.pigeon.ui.screens.log.EventLogScreen(viewModel = viewModel)
                 }
                 composable(Screen.Profile.route) {
                     val viewModel: ProfileViewModel = hiltViewModel()
