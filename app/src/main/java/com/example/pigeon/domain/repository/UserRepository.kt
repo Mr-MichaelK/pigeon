@@ -10,4 +10,5 @@ interface UserRepository {
     fun getUser(): Flow<User?>
     suspend fun saveUser(user: User)
     suspend fun isProfileLocked(): Boolean
+    suspend fun debugResetTimer() // Added for development only
 }

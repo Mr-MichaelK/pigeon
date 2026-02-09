@@ -49,6 +49,13 @@ class LocalUserRepository @Inject constructor(
         return difference < seventyTwoHoursInMillis
     }
 
+    override suspend fun debugResetTimer() {
+        val user = userDao.getUserSync() ?: return
+        // Set timestamp to 73 hours ago to ensure it's unlocked
+        val seventyThreeHoursAgo = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(73)
+        userDao.upsertUser(user.copy(lastUpdatedTimestamp = seventyThreeHoursAgo))
+    }
+
     private fun generateNodeName(): String {
         // Generate a rugged-style node name hash
         return "NODE-${UUID.randomUUID().toString().take(8).uppercase()}"
