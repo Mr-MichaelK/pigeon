@@ -15,11 +15,16 @@ import com.example.pigeon.ui.screens.onboarding.OnboardingScreen
 import com.example.pigeon.ui.screens.onboarding.OnboardingViewModel
 import com.example.pigeon.ui.screens.profile.ProfileScreen
 import com.example.pigeon.ui.screens.profile.ProfileViewModel
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.pigeon.ui.theme.StichColor
 import kotlinx.coroutines.flow.first
+import androidx.compose.foundation.layout.padding
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object Map : Screen("map")
+    object Radar : Screen("radar")
+    object Log : Screen("log")
     object Profile : Screen("profile")
 }
 
@@ -29,6 +34,10 @@ fun PigeonNavGraph(
 ) {
     val navController = rememberNavController()
     var startDestination by remember { mutableStateOf<String?>(null) }
+    
+    // items to decide when to show the bottom bar
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
     LaunchedEffect(Unit) {
         val user = userRepository.getUser().first()
@@ -36,34 +45,49 @@ fun PigeonNavGraph(
     }
 
     startDestination?.let { destination ->
-        NavHost(
-            navController = navController,
-            startDestination = destination
-        ) {
-            composable(Screen.Onboarding.route) {
-                val viewModel: OnboardingViewModel = hiltViewModel()
-                OnboardingScreen(
-                    viewModel = viewModel,
-                    onJoinComplete = {
-                        navController.navigate(Screen.Map.route) {
-                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+        androidx.compose.material3.Scaffold(
+            bottomBar = {
+                // Show Bottom Nav on all screens EXCEPT Onboarding
+                if (currentRoute != Screen.Onboarding.route) {
+                    StichBottomNav(navController = navController)
+                }
+            },
+            containerColor = StichColor.Background
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = destination,
+                modifier = androidx.compose.ui.Modifier.padding(innerPadding)
+            ) {
+                composable(Screen.Onboarding.route) {
+                    val viewModel: OnboardingViewModel = hiltViewModel()
+                    OnboardingScreen(
+                        viewModel = viewModel,
+                        onJoinComplete = {
+                            navController.navigate(Screen.Map.route) {
+                                popUpTo(Screen.Onboarding.route) { inclusive = true }
+                            }
                         }
-                    }
-                )
-            }
-            composable(Screen.Map.route) {
-                // Placeholder for Map Screen
-                // For now, this just has a button to go to Profile
-                com.example.pigeon.ui.screens.map.MapPlaceholderScreen(
-                    onOpenProfile = { navController.navigate(Screen.Profile.route) }
-                )
-            }
-            composable(Screen.Profile.route) {
-                val viewModel: ProfileViewModel = hiltViewModel()
-                ProfileScreen(
-                    viewModel = viewModel,
-                    onBack = { navController.popBackStack() }
-                )
+                    )
+                }
+                composable(Screen.Map.route) {
+                    com.example.pigeon.ui.screens.map.MapPlaceholderScreen(
+                        onOpenProfile = { navController.navigate(Screen.Profile.route) }
+                    )
+                }
+                composable(Screen.Radar.route) {
+                    com.example.pigeon.ui.screens.radar.RadarPlaceholderScreen()
+                }
+                composable(Screen.Log.route) {
+                    com.example.pigeon.ui.screens.log.LogPlaceholderScreen()
+                }
+                composable(Screen.Profile.route) {
+                    val viewModel: ProfileViewModel = hiltViewModel()
+                    ProfileScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
         }
     }

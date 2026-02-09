@@ -12,40 +12,41 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.pigeon.ui.theme.DarkBackground
 import com.example.pigeon.ui.theme.TacticalGreen
+import com.example.pigeon.ui.theme.StichColor
 
 @Composable
-fun MapPlaceholderScreen(onOpenProfile: () -> Unit) {
+fun MapPlaceholderScreen(
+    onOpenProfile: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground),
+            .background(StichColor.Background),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                text = "MAP VIEW [OFFLINE]",
+                text = "Map View",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TacticalGreen
+                color = StichColor.TextPrimary
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "GRID SYSTEM READY",
+                text = "MapLibre Integration Pending",
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.Gray
+                color = StichColor.TextSecondary
             )
             Spacer(modifier = Modifier.height(32.dp))
-            IconButton(
+            Button(
                 onClick = onOpenProfile,
-                modifier = Modifier.size(64.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile",
-                    tint = Color.White,
-                    modifier = Modifier.fillMaxSize()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = StichColor.Primary
                 )
+            ) {
+                Text("Go to Profile", color = Color.White)
             }
-            Text("IDENTITY", color = Color.White, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
