@@ -2,6 +2,8 @@ package com.example.pigeon.di
 
 import com.example.pigeon.data.repository.local.LocalUserRepository
 import com.example.pigeon.domain.repository.UserRepository
+import com.example.pigeon.data.repository.EventRepositoryImpl
+import com.example.pigeon.domain.repository.EventRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -20,4 +22,10 @@ abstract class RepositoryModule {
     abstract fun bindUserRepository(
         localUserRepository: LocalUserRepository
     ): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindEventRepository(
+        eventRepositoryImpl: EventRepositoryImpl
+    ): EventRepository
 }
