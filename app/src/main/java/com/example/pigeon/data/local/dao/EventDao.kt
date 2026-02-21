@@ -26,4 +26,7 @@ interface EventDao {
     
     @Query("SELECT * FROM events WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%'")
     suspend fun searchEvents(query: String): List<EventEntity>
+
+    @Query("DELETE FROM events")
+    suspend fun deleteAllEvents()
 }

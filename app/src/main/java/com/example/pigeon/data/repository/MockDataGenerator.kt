@@ -14,8 +14,8 @@ class MockDataGenerator @Inject constructor() {
         val baseLat = 33.8938 // Beirut roughly
         val baseLon = 35.5018
 
-        // Generate 15 mock events
-        for (i in 1..15) {
+        // Generate 5 mock events
+        for (i in 1..5) {
             val type = EventType.values().random()
             val isResolved = Random.nextBoolean()
             // Random time within last 48 hours

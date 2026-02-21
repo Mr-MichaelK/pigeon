@@ -10,4 +10,5 @@ interface EventRepository {
     suspend fun resolveEvent(eventId: String)
     suspend fun searchEvents(query: String): List<Event>
     suspend fun populateMockData()
+    suspend fun clearAllEvents()
 }

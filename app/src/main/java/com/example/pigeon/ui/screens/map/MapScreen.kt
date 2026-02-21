@@ -48,6 +48,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
+import org.maplibre.android.style.layers.Property
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +112,7 @@ fun MapScreen(
                     symbolManagerState.value = manager
                     
                     enableLocationComponent(map, style, context)
-                    updateSymbols(manager, uiState.events, currentZoom >= zoomThreshold)
+                    updateSymbols(manager, style, uiState.events, currentZoom >= zoomThreshold) // Pass style
 
                     manager.addClickListener { symbol ->
                         selectedEvent = uiState.events.find { 
@@ -142,7 +143,9 @@ fun MapScreen(
     val showTitles = currentZoom >= zoomThreshold
     LaunchedEffect(uiState.events, showTitles) {
         symbolManagerState.value?.let { manager ->
-            updateSymbols(manager, uiState.events, showTitles)
+            mapLibreMap?.getStyle { style ->
+                updateSymbols(manager, style, uiState.events, showTitles)
+            }
         }
     }
 
@@ -467,7 +470,7 @@ private fun enableLocationComponent(map: MapLibreMap, style: Style, context: and
     }
 }
 
-private fun updateSymbols(manager: SymbolManager?, events: List<Event>, showTitles: Boolean) {
+private fun updateSymbols(manager: SymbolManager?, style: Style, events: List<Event>, showTitles: Boolean) {
     manager?.deleteAll()
     events.forEach { event ->
         val iconImage = when (event.eventType) {
@@ -475,19 +478,38 @@ private fun updateSymbols(manager: SymbolManager?, events: List<Event>, showTitl
             EventType.WATER -> "pin-water"
             EventType.CONFLICT -> "pin-conflict"
             EventType.SOS, EventType.MEDICAL -> "pin-sos"
-            else -> "default-pin" // Fallback for other types
+            else -> "default-pin"
         }
 
+        // 1. Create Icon Symbol
         manager?.create(
             SymbolOptions()
                 .withLatLng(LatLng(event.latitude, event.longitude))
                 .withIconImage(iconImage)
-                .withIconSize(1.0f) // Standardized size
-                .withTextField(if (showTitles) event.title else "")
-                .withTextOffset(arrayOf(0f, 1.5f))
-                .withTextColor("rgba(23, 21, 17, 1)") // Tactical Black
-                .withTextSize(12f)
+                .withIconSize(1.0f)
         )
+
+        // 2. Create Label Symbol if zoomed in
+        if (showTitles) {
+            val labelTitle = event.title.uppercase()
+            val labelImageId = "label-${event.eventId}"
+            
+            // Generate and register label bitmap if not already in style
+            if (style.getImage(labelImageId) == null) {
+                createLabelPillBitmap(labelTitle)?.let { 
+                    style.addImage(labelImageId, it) 
+                }
+            }
+
+            manager?.create(
+                SymbolOptions()
+                    .withLatLng(LatLng(event.latitude, event.longitude))
+                    .withIconImage(labelImageId)
+                    .withIconAnchor(Property.ICON_ANCHOR_TOP)
+                    .withIconOffset(arrayOf(0f, 40f)) // Offset to sit comfortably below the pin
+                    .withIconSize(1.0f)
+            )
+        }
     }
 }
 
@@ -626,6 +648,46 @@ private fun createTacticalPinBitmap(
     recursiveDraw(icon.root)
     canvas.restore()
     
+    return bitmap
+}
+
+private fun createLabelPillBitmap(text: String): Bitmap? {
+    val paint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#171511") // Tactical Black
+        textSize = 32f // High-res source size
+        typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+        textAlign = android.graphics.Paint.Align.CENTER
+    }
+
+    val horizontalPadding = 32f
+    val verticalPadding = 20f
+    val cornerRadius = 24f
+
+    val textBounds = android.graphics.Rect()
+    paint.getTextBounds(text, 0, text.length, textBounds)
+
+    val width = textBounds.width() + (horizontalPadding * 2)
+    val height = textBounds.height() + (verticalPadding * 2)
+
+    val bitmap = Bitmap.createBitmap(width.toInt(), height.toInt(), Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = android.graphics.Paint.Style.FILL
+    }
+
+    val rect = android.graphics.RectF(0f, 0f, width, height)
+    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
+
+    // Add subtle tactical border
+    bgPaint.style = android.graphics.Paint.Style.STROKE
+    bgPaint.strokeWidth = 2f
+    bgPaint.color = android.graphics.Color.parseColor("#E5E0D6")
+    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
+
+    val textY = (height / 2f) - ((paint.descent() + paint.ascent()) / 2f)
+    canvas.drawText(text, width / 2f, textY, paint)
+
     return bitmap
 }
 

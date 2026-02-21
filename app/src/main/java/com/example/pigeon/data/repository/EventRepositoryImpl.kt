@@ -33,7 +33,12 @@ class EventRepositoryImpl @Inject constructor(
     }
 
     override suspend fun populateMockData() {
+        eventDao.deleteAllEvents() // Ensure clean slate on launch
         val mockEntities = mockDataGenerator.generateMockEvents()
         eventDao.insertEvents(mockEntities)
+    }
+
+    override suspend fun clearAllEvents() {
+        eventDao.deleteAllEvents()
     }
 }
