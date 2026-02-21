@@ -8,14 +8,12 @@ plugins {
 
 android {
     namespace = "com.example.pigeon"
-    compileSdk {
-        version = release(36)
-    }
-
+    compileSdk = 35
+    
     defaultConfig {
         applicationId = "com.example.pigeon"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -92,6 +90,9 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // MapLibre
+    implementation(libs.maplibre.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

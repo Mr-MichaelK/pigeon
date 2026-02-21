@@ -34,9 +34,9 @@
 
 ## 🟡 PHASE 2: Spatial Awareness (Mock Data)
 ### Task 2.1: MapLibre Integration
-- [ ] **Architect:** Design the MapView container and a mock Tile Provider (using Lebanon region).
-- [ ] **Coder:** Integrate MapLibre SDK and implement the Top Pill (Lat/Long display).
-- [ ] **Reviewer:** Ensure map components are optimized for offline-default rendering.
+- [x] **Architect:** Design the MapView container and Plan implementation.
+- [x] **Coder:** Integrate MapLibre SDK and implement the Top Pill (Lat/Long display).
+- [x] **Reviewer:** Ensure map components are optimized for offline-default rendering.
 
 ### Task 2.2: The Event Ledger (Mocked)
 - [x] **Architect:** Define the `Event` Room Entity (Immutable) and a `MockDataGenerator`.

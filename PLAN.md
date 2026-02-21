@@ -1,22 +1,40 @@
-# PLAN: Task 3.1 - Mesh Radar & Peer Discovery UI
+# PLAN: Task 2.1 - MapLibre Integration
 
-## 1. Domain & State Management
-* **State Logic:** Define an Enum `MeshPowerState` { OFF, PASSIVE, ACTIVE }.
-* **Peer Model:** Create `Peer.kt` data class.
-    * Fields: `deviceId`, `callsign`, `connectionType` (BLE/Wi-Fi), `rssi` (Signal Strength), `syncProgress` (0-100), `lastSeen` (Long).
-* **ViewModel:** `RadarViewModel.kt` to expose a `StateFlow<List<Peer>>` and handle the transition logic between power states.
+## Goal
+Integrate MapLibre Native SDK for offline situational awareness and implement the "Top Pill" coordinate overlay.
 
-## 2. UI Layer (Compose)
-* **3-Way Toggle:** A segmented control at the top to switch between OFF, PASSIVE, and ACTIVE modes.
-* **Radar Canvas:** A custom `Canvas` component.
-    * Use `drawCircle` for the radar rings.
-    * Map `Peer` RSSI values to distance from the center.
-    * Render peers as small icons; ensure they are **Read-Only** (no click listeners).
-* **Peer List:** A `LazyColumn` below the radar.
-    * **Live Peers:** Show callsign, signal meter, and a linear progress bar if a sync is active.
-    * **History:** A grayed-out section for peers synced in the last 24h.
+## Proposed Changes
 
-## 3. Visual & Technical Constraints
-* **Aesthetic:** Background #F8F7F6, Primary Gold #DF9C20 for active states.
-* **Battery Efficiency:** The Radar Canvas must use `remember` for drawing paths to avoid unnecessary recompositions during animation.
-* **Sync Pulse:** The "Mesh Pulse" indicator should pulse green when the device is in its 1-minute Active Window.
+### 1. Build & Manifest
+- **libs.versions.toml**: 
+    - Add `maplibre = "11.5.2"`.
+- **app/build.gradle.kts**:
+    - Add `maplibre-android` dependency.
+- **AndroidManifest.xml**:
+    - Add `INTERNET`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`.
+
+### 2. Domain Layer
+- **[NEW] MapMetadata.kt**: Domain model for viewport state (lat, long, zoom).
+
+### 3. Application Layer
+- **PigeonApplication.kt**: Initialize MapLibre in `onCreate`.
+
+### 4. UI Layer (Map Screen)
+- **[NEW] MapScreen.kt**:
+    - Implement `MapView` using `AndroidView` with strict lifecycle management (onCreate, onStart, etc.).
+    - Use "Tactical Sand" theme for the layout shell.
+- **[NEW] MapViewModel.kt**:
+    - Expose `MapUiState`.
+    - Handle `onMapMoved` to update metadata.
+- **[NEW] LatLongPill.kt**: 
+    - A floating overlay showing current decimal coordinates.
+    - Located in `com.example.pigeon.ui.screens.map.components`.
+
+## Logic Patterns
+- **Lifecycle Safety**: The `MapView` requires manual delegation of all lifecycle events to prevent crashes on rotation/exit.
+- **Offline Reliability**: For this phase, we use a remote demo style, but architect the system to easily swap to local `.mbtiles`.
+
+## Verification Plan (User to Run)
+1. **Build Check**: Sync and compile the app.
+2. **UI Check**: Navigate to the Map screen.
+3. **Behavior**: Verify that panning the map updates the Lat/Long pill in real-time.
