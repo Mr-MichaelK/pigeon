@@ -106,7 +106,6 @@ fun ProfileScreen(
                     EditProfileView(
                         uiState = uiState,
                         onRoleChange = viewModel::onRoleChange,
-                        onGenderChange = viewModel::onGenderChange,
                         onAnonymousToggle = viewModel::onAnonymousToggle,
                         onSave = viewModel::saveAndLockIdentity
                     )
@@ -122,11 +121,10 @@ fun ProfileHeader(user: User) {
         modifier = Modifier.size(120.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        // Avatar based on gender
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = CircleShape,
-            color = if (user.gender == "Male") Color(0xFFE0C09E) else Color(0xFFD1B08E),
+            color = Color(0xFFE0C09E), // Default tactical beige
             border = androidx.compose.foundation.BorderStroke(2.dp, StichColor.Primary)
         ) {
             Icon(
@@ -232,7 +230,6 @@ fun IdentityDetails(user: User) {
             .padding(16.dp)
     ) {
         DetailRow(label = "TACTICAL ROLE", value = user.role.uppercase(), isLast = false)
-        DetailRow(label = "GENDER", value = user.gender.uppercase(), isLast = false)
         DetailRow(label = "ANONYMOUS MODE", value = if (user.isAnonymous) "ENABLED" else "DISABLED", isLast = true)
     }
 }
@@ -274,7 +271,6 @@ fun DetailRow(label: String, value: String, isLast: Boolean) {
 fun EditProfileView(
     uiState: ProfileUiState,
     onRoleChange: (String) -> Unit,
-    onGenderChange: (String) -> Unit,
     onAnonymousToggle: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
@@ -285,13 +281,6 @@ fun EditProfileView(
             label = "OPERATIONAL ROLE",
             currentRole = uiState.editedRole,
             onRoleSelected = onRoleChange
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        StichProfileGenderSelector(
-            selectedGender = uiState.editedGender,
-            onGenderSelected = onGenderChange
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -375,49 +364,6 @@ fun StichProfileDropdown(
     }
 }
 
-@Composable
-fun StichProfileGenderSelector(
-    selectedGender: String,
-    onGenderSelected: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "GENDER",
-            style = MaterialTheme.typography.labelMedium,
-            color = StichColor.TextPrimary,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("Male", "Female").forEach { gender ->
-                val isSelected = selectedGender == gender
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .background(
-                            if (isSelected) StichColor.Primary.copy(alpha = 0.2f) else StichColor.Surface,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (isSelected) StichColor.Primary else StichColor.Border,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { onGenderSelected(gender) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = gender.uppercase(),
-                        color = if (isSelected) StichColor.Primary else StichColor.TextSecondary,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-                if (gender == "Male") Spacer(modifier = Modifier.width(8.dp))
-            }
-        }
-    }
-}
 
 @Composable
 fun StichProfileAnonymousToggle(

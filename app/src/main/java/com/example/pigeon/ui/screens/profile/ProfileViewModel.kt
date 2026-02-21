@@ -19,7 +19,6 @@ data class ProfileUiState(
     val canEdit: Boolean = false,
     // Draft state for editing
     val editedRole: String = "",
-    val editedGender: String = "",
     val editedIsAnonymous: Boolean = false
 )
 
@@ -45,8 +44,7 @@ class ProfileViewModel @Inject constructor(
                         user = user, 
                         // Initialize draft state if not already set or if user changed
                         editedRole = if (it.editedRole.isBlank()) user?.role ?: "Civilian" else it.editedRole,
-                        editedGender = if (it.editedGender.isBlank()) user?.gender ?: "Male" else it.editedGender,
-                        editedIsAnonymous = user?.isAnonymous ?: false, // Toggle doesn't need "if blank" check usually, but let's sync on load if not editing? Actually, syncing on load is safer.
+                        editedIsAnonymous = user?.isAnonymous ?: false,
                         isLoading = false,
                         isLocked = isLocked,
                         canEdit = !isLocked
@@ -54,7 +52,7 @@ class ProfileViewModel @Inject constructor(
                 }
                 // Determine implicit draft sync on first load
                 if (user != null && _uiState.value.editedRole.isBlank()) {
-                     _uiState.update { it.copy(editedRole = user.role, editedGender = user.gender, editedIsAnonymous = user.isAnonymous) }
+                     _uiState.update { it.copy(editedRole = user.role, editedIsAnonymous = user.isAnonymous) }
                 }
             }
         }
@@ -102,10 +100,6 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(editedRole = role) }
     }
 
-    fun onGenderChange(gender: String) {
-        _uiState.update { it.copy(editedGender = gender) }
-    }
-
     fun onAnonymousToggle(isAnonymous: Boolean) {
         _uiState.update { it.copy(editedIsAnonymous = isAnonymous) }
     }
@@ -115,7 +109,6 @@ class ProfileViewModel @Inject constructor(
             val validUser = _uiState.value.user ?: return@launch
             val updatedUser = validUser.copy(
                 role = _uiState.value.editedRole,
-                gender = _uiState.value.editedGender,
                 isAnonymous = _uiState.value.editedIsAnonymous,
                 lastUpdatedTimestamp = System.currentTimeMillis() // This locks it
             )

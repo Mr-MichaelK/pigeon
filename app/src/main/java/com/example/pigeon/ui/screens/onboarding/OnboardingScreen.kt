@@ -93,14 +93,6 @@ fun OnboardingScreen(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Gender Selector (To maintain functionality)
-            StichGenderSelector(
-                selectedGender = uiState.gender,
-                onGenderSelected = viewModel::onGenderChange
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
             
             // Anonymous Mode Toggle (To maintain functionality)
              StichAnonymousToggle(
@@ -357,53 +349,6 @@ fun StichDropdown(
     }
 }
 
-@Composable
-fun StichGenderSelector(
-    selectedGender: String,
-    onGenderSelected: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Text(
-            text = "Gender",
-            style = MaterialTheme.typography.labelMedium,
-            color = StichColor.TextPrimary,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("Male", "Female").forEach { gender ->
-                val isSelected = selectedGender == gender
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .background(
-                            if (isSelected) StichColor.Primary.copy(alpha = 0.2f) else StichColor.Surface,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (isSelected) StichColor.Primary else StichColor.Border,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { onGenderSelected(gender) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = gender,
-                        color = if (isSelected) StichColor.Primary else StichColor.TextSecondary,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-                if (gender == "Male") Spacer(modifier = Modifier.width(8.dp))
-            }
-        }
-    }
-}
 
 @Composable
 fun StichAnonymousToggle(

@@ -2,15 +2,17 @@ package com.example.pigeon.ui.screens.log
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.pigeon.data.local.entities.EventEntity
+import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.repository.EventRepository
+import com.example.pigeon.domain.usecase.EventFilter
+import com.example.pigeon.domain.usecase.GetEventsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class EventLogUiState(
-    val events: List<EventEntity> = emptyList(),
+    val events: List<Event> = emptyList(),
     val isLoading: Boolean = false,
     val selectedFilter: EventFilter = EventFilter.ALL,
     val searchQuery: String = ""
@@ -22,6 +24,7 @@ enum class EventFilter {
 
 @HiltViewModel
 class EventLogViewModel @Inject constructor(
+    private val getEventsUseCase: GetEventsUseCase,
     private val eventRepository: EventRepository
 ) : ViewModel() {
 
@@ -38,28 +41,8 @@ class EventLogViewModel @Inject constructor(
 
     private fun loadEvents() {
         viewModelScope.launch {
-            combine(
-                eventRepository.getAllEvents(),
-                _uiState.map { it.selectedFilter },
-                _uiState.map { it.searchQuery }
-            ) { events, filter, query ->
-                var filtered = events
-                
-                // Apply Filter
-                if (filter == EventFilter.UNRESOLVED) {
-                    filtered = filtered.filter { !it.isResolved }
-                }
-                // Nearby filter would need location logic, skipping for now layout
-                
-                // Apply Search
-                if (query.isNotEmpty()) {
-                    filtered = filtered.filter { 
-                        it.title.contains(query, ignoreCase = true) || 
-                        it.description.contains(query, ignoreCase = true) 
-                    }
-                }
-                
-                filtered
+            _uiState.flatMapLatest { state ->
+                getEventsUseCase(state.selectedFilter, state.searchQuery)
             }.collect { filteredEvents ->
                 _uiState.update { it.copy(events = filteredEvents, isLoading = false) }
             }

@@ -1,7 +1,7 @@
 package com.example.pigeon.data.repository
 
 import com.example.pigeon.data.local.entities.EventEntity
-import com.example.pigeon.data.local.entities.EventType
+import com.example.pigeon.domain.model.EventType
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random

@@ -14,7 +14,6 @@ import javax.inject.Inject
 
 data class OnboardingUiState(
     val displayName: String = "",
-    val gender: String = "Male",
     val role: String = "Civilian",
     val isAnonymous: Boolean = false,
     val isSaving: Boolean = false,
@@ -33,10 +32,6 @@ class OnboardingViewModel @Inject constructor(
         _uiState.update { it.copy(displayName = newName) }
     }
 
-    fun onGenderChange(newGender: String) {
-        _uiState.update { it.copy(gender = newGender) }
-    }
-
     fun onRoleChange(newRole: String) {
         _uiState.update { it.copy(role = newRole) }
     }
@@ -51,7 +46,6 @@ class OnboardingViewModel @Inject constructor(
             
             val user = User(
                 displayName = _uiState.value.displayName,
-                gender = _uiState.value.gender,
                 role = _uiState.value.role,
                 nodeName = "", // Repository will generate this
                 isAnonymous = _uiState.value.isAnonymous,

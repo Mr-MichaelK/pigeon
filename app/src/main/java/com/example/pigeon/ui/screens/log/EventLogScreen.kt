@@ -21,8 +21,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.pigeon.data.local.entities.EventEntity
-import com.example.pigeon.data.local.entities.EventType
+import com.example.pigeon.domain.model.Event
+import com.example.pigeon.domain.model.EventType
+import com.example.pigeon.domain.usecase.EventFilter
 import com.example.pigeon.ui.theme.StichColor
 import java.text.SimpleDateFormat
 import java.util.*
@@ -179,7 +180,7 @@ fun EventLogFilterRow(
 
 @Composable
 fun EventLogItem(
-    event: EventEntity,
+    event: Event,
     onResolve: () -> Unit
 ) {
     Row(
