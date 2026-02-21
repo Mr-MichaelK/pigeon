@@ -1,6 +1,8 @@
 package com.example.pigeon.ui.screens.map
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,12 +21,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.pigeon.R
 import com.example.pigeon.domain.model.Event
+import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.ui.screens.map.components.LatLongPill
 import com.example.pigeon.ui.theme.MeshColor
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -49,6 +54,10 @@ fun MapScreen(
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     val symbolManagerState = remember { mutableStateOf<SymbolManager?>(null) }
     var selectedEvent by remember { mutableStateOf<Event?>(null) }
+    
+    // Threshold for showing titles
+    val zoomThreshold = 14.0
+    var currentZoom by remember { mutableDoubleStateOf(uiState.metadata.zoom) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -76,6 +85,10 @@ fun MapScreen(
             getMapAsync { map ->
                 mapLibreMap = map
                 map.setStyle("https://demotiles.maplibre.org/style.json") { style ->
+                    // Load the red SVG pin into the style
+                    val pinBitmap = drawableToBitmap(context, R.drawable.ic_default_pin)
+                    pinBitmap?.let { style.addImage("default-pin", it) }
+
                     val manager = SymbolManager(this@apply, map, style).apply {
                         iconAllowOverlap = true
                         textAllowOverlap = true
@@ -83,7 +96,7 @@ fun MapScreen(
                     symbolManagerState.value = manager
                     
                     enableLocationComponent(map, style, context)
-                    updateSymbols(manager, uiState.events)
+                    updateSymbols(manager, uiState.events, currentZoom >= zoomThreshold)
 
                     manager.addClickListener { symbol ->
                         selectedEvent = uiState.events.find { 
@@ -98,6 +111,7 @@ fun MapScreen(
                     val camera = map.cameraPosition
                     val target = camera.target
                     if (target != null) {
+                        currentZoom = camera.zoom
                         viewModel.onMapMoved(
                             target.latitude,
                             target.longitude,
@@ -109,10 +123,11 @@ fun MapScreen(
         }
     }
 
-    // React to event changes to update symbols
-    LaunchedEffect(uiState.events) {
+    // React to event changes OR zoom threshold cross to update symbols
+    val showTitles = currentZoom >= zoomThreshold
+    LaunchedEffect(uiState.events, showTitles) {
         symbolManagerState.value?.let { manager ->
-            updateSymbols(manager, uiState.events)
+            updateSymbols(manager, uiState.events, showTitles)
         }
     }
 
@@ -320,14 +335,31 @@ private fun enableLocationComponent(map: MapLibreMap, style: Style, context: and
     }
 }
 
-private fun updateSymbols(manager: SymbolManager?, events: List<Event>) {
+private fun updateSymbols(manager: SymbolManager?, events: List<Event>, showTitles: Boolean) {
     manager?.deleteAll()
     events.forEach { event ->
         manager?.create(
             SymbolOptions()
                 .withLatLng(LatLng(event.latitude, event.longitude))
-                .withTextField(event.title)
+                .withIconImage("default-pin")
+                .withIconSize(1.5f)
+                .withTextField(if (showTitles) event.title else "")
                 .withTextOffset(arrayOf(0f, 1.5f))
+                .withTextColor("rgba(23, 21, 17, 1)") // Tactical Black
+                .withTextSize(12f)
         )
     }
+}
+
+private fun drawableToBitmap(context: android.content.Context, drawableId: Int): Bitmap? {
+    val drawable = ContextCompat.getDrawable(context, drawableId) ?: return null
+    val bitmap = Bitmap.createBitmap(
+        drawable.intrinsicWidth,
+        drawable.intrinsicHeight,
+        Bitmap.Config.ARGB_8888
+    )
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    return bitmap
 }
