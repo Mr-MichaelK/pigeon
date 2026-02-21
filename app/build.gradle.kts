@@ -93,6 +93,7 @@ dependencies {
 
     // MapLibre
     implementation(libs.maplibre.android)
+    implementation(libs.maplibre.annotation)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
