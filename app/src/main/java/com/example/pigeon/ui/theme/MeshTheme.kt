@@ -2,7 +2,7 @@ package com.example.pigeon.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-object StichColor {
+object MeshColor {
     val Primary = Color(0xFFDF9C20) // Gold/Orange
     val Background = Color(0xFFF8F7F6) // Bright Beige
     val Surface = Color(0xFFFFFFFF) // White

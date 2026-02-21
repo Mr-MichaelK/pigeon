@@ -21,14 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 
 @Composable
 fun RadarPlaceholderScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(StichColor.Background),
+            .background(MeshColor.Background),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -36,24 +36,24 @@ fun RadarPlaceholderScreen() {
                 modifier = Modifier
                     .size(200.dp)
                     .clip(CircleShape)
-                    .background(StichColor.Surface)
-                    .border(2.dp, StichColor.Primary.copy(alpha = 0.5f), CircleShape),
+                    .background(MeshColor.Surface)
+                    .border(2.dp, MeshColor.Primary.copy(alpha = 0.5f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
                         .size(140.dp)
-                        .border(1.dp, StichColor.Primary.copy(alpha = 0.3f), CircleShape)
+                        .border(1.dp, MeshColor.Primary.copy(alpha = 0.3f), CircleShape)
                 )
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .border(1.dp, StichColor.Primary.copy(alpha = 0.3f), CircleShape)
+                        .border(1.dp, MeshColor.Primary.copy(alpha = 0.3f), CircleShape)
                 )
                 Icon(
                     imageVector = Icons.Default.Radar,
                     contentDescription = null,
-                    tint = StichColor.Primary,
+                    tint = MeshColor.Primary,
                     modifier = Modifier.size(48.dp)
                 )
             }
@@ -63,14 +63,14 @@ fun RadarPlaceholderScreen() {
             Text(
                 text = "Scanning for Mesh Peers...",
                 style = MaterialTheme.typography.titleMedium,
-                color = StichColor.TextPrimary,
+                color = MeshColor.TextPrimary,
                 fontWeight = FontWeight.Bold
             )
             
             Text(
                 text = "Activate nearby discovery to connect.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = StichColor.TextSecondary,
+                color = MeshColor.TextSecondary,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }

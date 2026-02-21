@@ -16,7 +16,7 @@ import com.example.pigeon.ui.screens.onboarding.OnboardingViewModel
 import com.example.pigeon.ui.screens.profile.ProfileScreen
 import com.example.pigeon.ui.screens.profile.ProfileViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.padding
 
@@ -49,10 +49,10 @@ fun PigeonNavGraph(
             bottomBar = {
                 // Show Bottom Nav on all screens EXCEPT Onboarding
                 if (currentRoute != Screen.Onboarding.route) {
-                    StichBottomNav(navController = navController)
+                    MeshBottomNav(navController = navController)
                 }
             },
-            containerColor = StichColor.Background
+            containerColor = MeshColor.Background
         ) { innerPadding ->
             NavHost(
                 navController = navController,

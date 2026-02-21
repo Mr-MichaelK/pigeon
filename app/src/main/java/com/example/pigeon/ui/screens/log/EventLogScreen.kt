@@ -24,7 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.usecase.EventFilter
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,13 +37,13 @@ fun EventLogScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(StichColor.Background)
+            .background(MeshColor.Background)
     ) {
         // Top Bar Area
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(StichColor.Background)
+                .background(MeshColor.Background)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             EventLogSearchBar(
@@ -59,18 +59,18 @@ fun EventLogScreen(
             )
         }
 
-        HorizontalDivider(color = StichColor.Border)
+        HorizontalDivider(color = MeshColor.Border)
 
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = StichColor.Primary)
+                CircularProgressIndicator(color = MeshColor.Primary)
             }
         } else if (uiState.events.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = "NO EVENTS FOUND",
                     style = MaterialTheme.typography.titleMedium,
-                    color = StichColor.TextSecondary,
+                    color = MeshColor.TextSecondary,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -99,8 +99,8 @@ fun EventLogSearchBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .background(StichColor.Surface, RoundedCornerShape(8.dp))
-            .border(1.dp, StichColor.Border, RoundedCornerShape(8.dp))
+            .background(MeshColor.Surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -108,7 +108,7 @@ fun EventLogSearchBar(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = null,
-                tint = StichColor.TextSecondary,
+                tint = MeshColor.TextSecondary,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -118,15 +118,15 @@ fun EventLogSearchBar(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = StichColor.TextPrimary
+                    color = MeshColor.TextPrimary
                 ),
-                cursorBrush = SolidColor(StichColor.Primary),
+                cursorBrush = SolidColor(MeshColor.Primary),
                 decorationBox = { innerTextField ->
                     if (query.isEmpty()) {
                         Text(
                             text = "Search logs...",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = StichColor.TextSecondary
+                            color = MeshColor.TextSecondary
                         )
                     }
                     innerTextField()
@@ -159,17 +159,17 @@ fun EventLogFilterRow(
                     ) 
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = StichColor.Primary,
+                    selectedContainerColor = MeshColor.Primary,
                     selectedLabelColor = Color.White,
-                    containerColor = StichColor.Surface,
-                    labelColor = StichColor.TextSecondary
+                    containerColor = MeshColor.Surface,
+                    labelColor = MeshColor.TextSecondary
                 ),
                 // FIXED: Passing mandatory enabled/selected parameters
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = isSelected,
-                    borderColor = StichColor.Border,
-                    selectedBorderColor = StichColor.Primary,
+                    borderColor = MeshColor.Border,
+                    selectedBorderColor = MeshColor.Primary,
                     borderWidth = 1.dp,
                     selectedBorderWidth = 1.dp
                 )
@@ -198,7 +198,7 @@ fun EventLogItem(
                 modifier = Modifier
                     .size(10.dp)
                     .background(
-                        color = if (event.isResolved) StichColor.SuccessGreen else StichColor.Primary,
+                        color = if (event.isResolved) MeshColor.SuccessGreen else MeshColor.Primary,
                         shape = CircleShape
                     )
             )
@@ -206,7 +206,7 @@ fun EventLogItem(
                 modifier = Modifier
                     .width(2.dp)
                     .weight(1f) // Use weight to fill vertical space properly
-                    .background(StichColor.Border)
+                    .background(MeshColor.Border)
             )
         }
 
@@ -216,9 +216,9 @@ fun EventLogItem(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = StichColor.Surface),
+                colors = CardDefaults.cardColors(containerColor = MeshColor.Surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, StichColor.Border)
+                border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -230,7 +230,7 @@ fun EventLogItem(
                         Text(
                             text = formatTimestamp(event.timestamp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = StichColor.TextSecondary
+                            color = MeshColor.TextSecondary
                         )
                     }
 
@@ -239,7 +239,7 @@ fun EventLogItem(
                     Text(
                         text = event.title,
                         style = MaterialTheme.typography.titleMedium,
-                        color = StichColor.TextPrimary,
+                        color = MeshColor.TextPrimary,
                         fontWeight = FontWeight.Bold
                     )
 
@@ -248,7 +248,7 @@ fun EventLogItem(
                     Text(
                         text = event.description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = StichColor.TextSecondary,
+                        color = MeshColor.TextSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -263,9 +263,9 @@ fun EventLogItem(
                         Text(
                             text = event.creatorDeviceId,
                             style = MaterialTheme.typography.labelSmall,
-                            color = StichColor.TextSecondary,
+                            color = MeshColor.TextSecondary,
                             modifier = Modifier
-                                .background(StichColor.Background, RoundedCornerShape(4.dp))
+                                .background(MeshColor.Background, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                         
@@ -277,7 +277,7 @@ fun EventLogItem(
                             ) {
                                 Text(
                                     text = "MARK RESOLVED",
-                                    color = StichColor.Primary,
+                                    color = MeshColor.Primary,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -287,13 +287,13 @@ fun EventLogItem(
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = StichColor.SuccessGreen,
+                                    tint = MeshColor.SuccessGreen,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "RESOLVED",
-                                    color = StichColor.SuccessGreen,
+                                    color = MeshColor.SuccessGreen,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold
                                 )

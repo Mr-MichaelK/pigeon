@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.pigeon.ui.theme.DarkBackground
 import com.example.pigeon.ui.theme.TacticalGreen
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 
 @Composable
 fun MapPlaceholderScreen(
@@ -21,7 +21,7 @@ fun MapPlaceholderScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(StichColor.Background),
+            .background(MeshColor.Background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -30,19 +30,19 @@ fun MapPlaceholderScreen(
             Text(
                 text = "Map View",
                 style = MaterialTheme.typography.headlineMedium,
-                color = StichColor.TextPrimary
+                color = MeshColor.TextPrimary
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "MapLibre Integration Pending",
                 style = MaterialTheme.typography.bodyLarge,
-                color = StichColor.TextSecondary
+                color = MeshColor.TextSecondary
             )
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = onOpenProfile,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = StichColor.Primary
+                    containerColor = MeshColor.Primary
                 )
             ) {
                 Text("Go to Profile", color = Color.White)
