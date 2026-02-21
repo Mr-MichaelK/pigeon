@@ -6,20 +6,26 @@ import android.graphics.Canvas
 import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -150,12 +156,34 @@ fun MapScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MeshColor.Background,
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                FloatingActionButton(
-                    onClick = {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Sticky Header: Mesh Status
+        MeshHeader()
+
+        Box(modifier = Modifier.weight(1f)) {
+            // MapLibre View Container
+            AndroidView(
+                factory = { mapView },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Top Overlays
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                // Coordinate Pill (Left)
+                LatLongPill(
+                    latitude = uiState.metadata.latitude,
+                    longitude = uiState.metadata.longitude
+                )
+
+                // Tool Stack (Right)
+                ToolStack(
+                    onMyLocationClick = {
                         if (org.maplibre.android.location.permissions.PermissionsManager.areLocationPermissionsGranted(context)) {
                             try {
                                 mapLibreMap?.locationComponent?.lastKnownLocation?.let { loc ->
@@ -169,49 +197,46 @@ fun MapScreen(
                             requestLocationPermissions()
                         }
                     },
-                    containerColor = MeshColor.Surface,
-                    contentColor = MeshColor.TextPrimary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "My Location")
-                }
+                    onZoomIn = {
+                        mapLibreMap?.animateCamera(CameraUpdateFactory.zoomIn())
+                    },
+                    onZoomOut = {
+                        mapLibreMap?.animateCamera(CameraUpdateFactory.zoomOut())
+                    }
+                )
+            }
 
-                FloatingActionButton(
-                    onClick = { /* TODO: Open Reporting Wizard */ },
-                    containerColor = MeshColor.Primary,
-                    contentColor = MeshColor.Background
+            // Bottom Actions (Large Buttons)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 24.dp, vertical = 32.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Button(
+                    onClick = { /* TODO: Reporting Wizard */ },
+                    modifier = Modifier
+                        .height(64.dp)
+                        .weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MeshColor.EmergencyRed),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Report Event")
+                    Icon(
+                        imageVector = Icons.Outlined.Emergency,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "REPORT",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp
+                    )
                 }
             }
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // MapLibre View Container
-            AndroidView(
-                factory = { mapView },
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Top Pill Overlay (Lat/Long)
-            LatLongPill(
-                latitude = uiState.metadata.latitude,
-                longitude = uiState.metadata.longitude,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
-            )
-
-            // Connectivity Bar / Mesh Status indicator (Placeholder)
-            ConnectivityBar(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 64.dp)
-            )
 
             // Event Detail Sheet Placeholder
             if (selectedEvent != null) {
@@ -220,6 +245,142 @@ fun MapScreen(
                     onClose = { selectedEvent = null },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun MeshHeader() {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp),
+        color = MeshColor.Surface,
+        border = BorderStroke(1.dp, MeshColor.Border)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Pulse Icon
+                Box(contentAlignment = Alignment.Center) {
+                    val infiniteTransition = rememberInfiniteTransition()
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 0.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        )
+                    )
+                    
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = MeshColor.Primary.copy(alpha = 0.1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.WifiTethering,
+                            contentDescription = "Mesh Active",
+                            tint = MeshColor.MeshBlue,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                    
+                    // Status dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .align(Alignment.TopEnd)
+                            .clip(CircleShape)
+                            .background(Color(0xFF4ADE80).copy(alpha = pulseAlpha)) // Green 400
+                            .border(1.5.dp, MeshColor.Surface, CircleShape)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column {
+                    Text(
+                        "MESH ACTIVE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MeshColor.TextPrimary,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        "Connected • Low Latency",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MeshColor.TextSecondary
+                    )
+                }
+            }
+            
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    "2m ago",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MeshColor.TextPrimary
+                )
+                Text(
+                    "SYNCED",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MeshColor.TextSecondary,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ToolStack(
+    onMyLocationClick: () -> Unit,
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Near Me Button
+        Surface(
+            onClick = onMyLocationClick,
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = MeshColor.Surface.copy(alpha = 0.9f),
+            shadowElevation = 4.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.NearMe,
+                    contentDescription = "My Location",
+                    tint = MeshColor.TextPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        
+        // Zoom Pill
+        Surface(
+            modifier = Modifier.width(48.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MeshColor.Surface.copy(alpha = 0.9f),
+            shadowElevation = 4.dp
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(onClick = onZoomIn, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Outlined.Add, contentDescription = "Zoom In", tint = MeshColor.TextPrimary)
+                }
+                Divider(modifier = Modifier.width(20.dp), color = MeshColor.TextPrimary.copy(alpha = 0.1f))
+                IconButton(onClick = onZoomOut, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Outlined.Remove, contentDescription = "Zoom Out", tint = MeshColor.TextPrimary)
+                }
             }
         }
     }
@@ -254,7 +415,7 @@ fun EventDetailSheet(
                     fontWeight = FontWeight.Bold
                 )
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Add, contentDescription = "Close", modifier = Modifier.size(24.dp))
+                    Icon(Icons.Outlined.Close, contentDescription = "Close", modifier = Modifier.size(24.dp))
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -277,44 +438,6 @@ fun EventDetailSheet(
             ) {
                 Text("RESOLVE INCIDENT", color = MeshColor.Background)
             }
-        }
-    }
-}
-
-@Composable
-fun ConnectivityBar(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        color = MeshColor.Surface.copy(alpha = 0.9f),
-        shape = RoundedCornerShape(8.dp),
-        shadowElevation = 4.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    text = "MESH STATUS: PASSIVE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MeshColor.TextSecondary
-                )
-                Text(
-                    text = "Synced: Just Now",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MeshColor.TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(MeshColor.SuccessGreen, shape = RoundedCornerShape(4.dp))
-            )
         }
     }
 }
