@@ -19,7 +19,8 @@ data class ProfileUiState(
     val canEdit: Boolean = false,
     // Draft state for editing
     val editedRole: String = "",
-    val editedIsAnonymous: Boolean = false
+    val editedIsAnonymous: Boolean = false,
+    val isSaving: Boolean = false
 )
 
 @HiltViewModel
@@ -106,6 +107,7 @@ class ProfileViewModel @Inject constructor(
 
     fun saveAndLockIdentity() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
             val validUser = _uiState.value.user ?: return@launch
             val updatedUser = validUser.copy(
                 role = _uiState.value.editedRole,
@@ -113,7 +115,7 @@ class ProfileViewModel @Inject constructor(
                 lastUpdatedTimestamp = System.currentTimeMillis() // This locks it
             )
             userRepository.saveUser(updatedUser)
-            // State update will happen via flow collection in loadUser
+            _uiState.update { it.copy(isSaving = false) }
         }
     }
 

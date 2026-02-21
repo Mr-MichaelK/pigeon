@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -70,7 +72,6 @@ fun OnboardingScreen(
             Text(
                 text = "Edit Identity",
                 style = MaterialTheme.typography.titleLarge,
-                color = MeshColor.TextPrimary,
                 color = MeshColor.TextPrimary,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -121,6 +122,16 @@ fun OnboardingScreen(
             )
         }
     }
+}
+
+@Composable
+fun MeshTopBar(title: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MeshColor.Background)
+            .height(16.dp) 
+    )
 }
 
 @Composable

@@ -1,18 +1,16 @@
 package com.example.pigeon.ui.screens.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -23,9 +21,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.User
 import com.example.pigeon.ui.theme.MeshColor
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 
 
 @Composable
@@ -174,7 +171,7 @@ fun CountdownCard(countdownText: String, isLocked: Boolean) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MeshColor.Surface,
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        tonalElevation = 0.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
     ) {
         Column(
@@ -420,7 +417,7 @@ fun MeshProfileSaveGroup(
         modifier = Modifier
             .fillMaxWidth()
             .background(MeshColor.Surface, RoundedCornerShape(16.dp))
-            .border(2.dp, MeshColor.Primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .bottomBorder(2.dp, MeshColor.Primary.copy(alpha = 0.2f))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -463,17 +460,31 @@ fun MeshProfileSaveGroup(
                 .height(64.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                text = "SAVE & LOCK IDENTITY",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                letterSpacing = 1.sp
-            )
+                containerColor = MeshColor.Primary,
+                disabledContainerColor = MeshColor.Primary.copy(alpha = 0.5f)
+            ),
+            enabled = !isSaving
+        ) {
+            if (isSaving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = "SAVE & LOCK IDENTITY",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    letterSpacing = 1.sp
+                )
+            }
         }
     }
 }
 
-private fun Modifier.border(bottom: androidx.compose.ui.unit.Dp, color: Color) = this.drawBehind {
+private fun Modifier.bottomBorder(bottom: androidx.compose.ui.unit.Dp, color: Color) = this.drawBehind {
     val strokeWidth = bottom.toPx()
     val y = size.height - strokeWidth / 2
     drawLine(
