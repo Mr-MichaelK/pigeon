@@ -18,21 +18,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 
 @Composable
 fun LogPlaceholderScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(StichColor.Background),
+            .background(MeshColor.Background),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = Icons.Default.History,
                 contentDescription = null,
-                tint = StichColor.TextSecondary,
+                tint = MeshColor.TextSecondary,
                 modifier = Modifier.size(64.dp)
             )
             
@@ -41,14 +41,14 @@ fun LogPlaceholderScreen() {
             Text(
                 text = "System Events",
                 style = MaterialTheme.typography.titleLarge,
-                color = StichColor.TextPrimary,
+                color = MeshColor.TextPrimary,
                 fontWeight = FontWeight.Bold
             )
             
             Text(
                 text = "No recent activity recorded.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = StichColor.TextSecondary,
+                color = MeshColor.TextSecondary,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }

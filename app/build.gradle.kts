@@ -48,6 +48,12 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.all {
+            it.maxHeapSize = "2g"
+        }
+    }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.15"
     }

@@ -38,7 +38,6 @@ class ProfileViewModelTest {
     fun `loadUser updates uiState with user and lock status`() = runTest {
         val user = User(
             displayName = "Test User",
-            gender = "Male",
             role = "Civilian",
             nodeName = "NODE-12345678",
             isAnonymous = false,
@@ -61,7 +60,6 @@ class ProfileViewModelTest {
         val tenHoursAgo = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(10)
         val user = User(
             displayName = "Test User",
-            gender = "Male",
             role = "Civilian",
             nodeName = "NODE-12345678",
             isAnonymous = false,
@@ -84,7 +82,6 @@ class ProfileViewModelTest {
         val seventyThreeHoursAgo = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(73)
         val user = User(
             displayName = "Test User",
-            gender = "Male",
             role = "Civilian",
             nodeName = "NODE-12345678",
             isAnonymous = false,

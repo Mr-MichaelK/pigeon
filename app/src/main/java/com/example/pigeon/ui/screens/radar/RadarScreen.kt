@@ -30,7 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.ConnectionType
 import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -55,7 +55,7 @@ fun RadarScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(StichColor.Background)
+            .background(MeshColor.Background)
     ) {
         // Top Control Area
         Column(
@@ -77,7 +77,7 @@ fun RadarScreen(
                     .size(300.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFF0EFE9)) // Slightly darker than background
-                    .border(1.dp, StichColor.Border, CircleShape),
+                    .border(1.dp, MeshColor.Border, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 RadarCanvas(
@@ -88,7 +88,7 @@ fun RadarScreen(
             }
         }
         
-        Divider(color = StichColor.Border)
+        Divider(color = MeshColor.Border)
         
         // Peer List
         PeerListSection(
@@ -107,8 +107,8 @@ fun PowerStateToggle(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .background(StichColor.Surface, RoundedCornerShape(24.dp))
-            .border(1.dp, StichColor.Border, RoundedCornerShape(24.dp))
+            .background(MeshColor.Surface, RoundedCornerShape(24.dp))
+            .border(1.dp, MeshColor.Border, RoundedCornerShape(24.dp))
             .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -116,13 +116,13 @@ fun PowerStateToggle(
             val isSelected = currentState == state
             val backgroundColor = if (isSelected) {
                 when (state) {
-                    MeshPowerState.ACTIVE -> StichColor.Primary
-                    MeshPowerState.PASSIVE -> StichColor.TextSecondary
+                    MeshPowerState.ACTIVE -> MeshColor.Primary
+                    MeshPowerState.PASSIVE -> MeshColor.TextSecondary
                     MeshPowerState.OFF -> Color.Gray
                 }
             } else Color.Transparent
             
-            val contentColor = if (isSelected) Color.White else StichColor.TextSecondary
+            val contentColor = if (isSelected) Color.White else MeshColor.TextSecondary
             
             Box(
                 modifier = Modifier
@@ -156,7 +156,7 @@ fun RadarCanvas(
         // Draw Rings
         for (i in 1..3) {
             drawCircle(
-                color = StichColor.Border,
+                color = MeshColor.Border,
                 radius = maxRadius * (i / 3f),
                 style = Stroke(width = 1.dp.toPx())
             )
@@ -164,7 +164,7 @@ fun RadarCanvas(
         
         if (powerState != MeshPowerState.OFF) {
             // Draw Sweep
-            val sweepColor = if (powerState == MeshPowerState.ACTIVE) StichColor.Primary else StichColor.TextSecondary
+            val sweepColor = if (powerState == MeshPowerState.ACTIVE) MeshColor.Primary else MeshColor.TextSecondary
             
             // Not truly implementing a sweep gradient for simplicity, using a rotating line
             val sweepRad = Math.toRadians(sweepAngle.toDouble())
@@ -193,7 +193,7 @@ fun RadarCanvas(
                 val peerY = center.y + (maxRadius * normalizedDist) * sin(rad).toFloat()
                 
                 drawCircle(
-                    color = StichColor.Primary,
+                    color = MeshColor.Primary,
                     radius = 6.dp.toPx(),
                     center = Offset(peerX, peerY)
                 )
@@ -216,7 +216,7 @@ fun PeerListSection(
                 Text(
                     text = "LIVE PEERS (${activePeers.size})",
                     style = MaterialTheme.typography.labelSmall,
-                    color = StichColor.TextSecondary,
+                    color = MeshColor.TextSecondary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -233,7 +233,7 @@ fun PeerListSection(
                 Text(
                     text = "PEER HISTORY (LAST 24H)",
                     style = MaterialTheme.typography.labelSmall,
-                    color = StichColor.TextSecondary,
+                    color = MeshColor.TextSecondary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -251,9 +251,9 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = StichColor.Surface),
+        colors = CardDefaults.cardColors(containerColor = MeshColor.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, StichColor.Border)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
     ) {
         Row(
             modifier = Modifier
@@ -266,7 +266,7 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        color = if (isActive) StichColor.Primary.copy(alpha = 0.1f) else Color(0xFFF0EFE9),
+                        color = if (isActive) MeshColor.Primary.copy(alpha = 0.1f) else Color(0xFFF0EFE9),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -274,7 +274,7 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
                 Icon(
                     imageVector = if (peer.connectionType == ConnectionType.BLE) Icons.Default.Bluetooth else Icons.Default.Wifi,
                     contentDescription = null,
-                    tint = if (isActive) StichColor.Primary else StichColor.TextSecondary,
+                    tint = if (isActive) MeshColor.Primary else MeshColor.TextSecondary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -286,12 +286,12 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
                     text = peer.callsign,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isActive) StichColor.TextPrimary else StichColor.TextSecondary
+                    color = if (isActive) MeshColor.TextPrimary else MeshColor.TextSecondary
                 )
                 Text(
                     text = "Signal: ${peer.rssi} dBm",
                     style = MaterialTheme.typography.bodySmall,
-                    color = StichColor.TextSecondary
+                    color = MeshColor.TextSecondary
                 )
             }
             
@@ -299,7 +299,7 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
                 CircularProgressIndicator(
                     progress = peer.syncProgress,
                     modifier = Modifier.size(24.dp),
-                    color = StichColor.SuccessGreen,
+                    color = MeshColor.SuccessGreen,
                     strokeWidth = 2.dp
                 )
             }

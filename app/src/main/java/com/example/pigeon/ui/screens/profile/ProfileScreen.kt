@@ -1,18 +1,16 @@
 package com.example.pigeon.ui.screens.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -22,9 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.User
-import com.example.pigeon.ui.theme.*
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
+import com.example.pigeon.ui.theme.MeshColor
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 
 
 @Composable
@@ -37,7 +35,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(StichColor.Background)
+            .background(MeshColor.Background)
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -47,7 +45,7 @@ fun ProfileScreen(
         Text(
             text = "IDENTITY PROFILE",
             style = MaterialTheme.typography.headlineMedium,
-            color = StichColor.TextPrimary,
+            color = MeshColor.TextPrimary,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.2.sp
         )
@@ -55,7 +53,7 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.height(32.dp))
         
         if (uiState.isLoading) {
-            CircularProgressIndicator(color = StichColor.Primary)
+            CircularProgressIndicator(color = MeshColor.Primary)
         } else {
             uiState.user?.let { user ->
                 ProfileHeader(user)
@@ -73,7 +71,6 @@ fun ProfileScreen(
                     IdentityDetails(user)
                     
                     Spacer(modifier = Modifier.height(32.dp))
-                    
                     Button(
                         onClick = onBack,
                         modifier = Modifier
@@ -81,7 +78,7 @@ fun ProfileScreen(
                             .height(56.dp),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = StichColor.Primary,
+                            containerColor = MeshColor.Primary,
                             contentColor = Color.White
                         )
                     ) {
@@ -98,7 +95,7 @@ fun ProfileScreen(
                     ) {
                         Text(
                             text = "DEBUG: RESET 72H TIMER",
-                            color = StichColor.Primary.copy(alpha = 0.5f),
+                            color = MeshColor.Primary.copy(alpha = 0.5f),
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -106,7 +103,6 @@ fun ProfileScreen(
                     EditProfileView(
                         uiState = uiState,
                         onRoleChange = viewModel::onRoleChange,
-                        onGenderChange = viewModel::onGenderChange,
                         onAnonymousToggle = viewModel::onAnonymousToggle,
                         onSave = viewModel::saveAndLockIdentity
                     )
@@ -122,12 +118,11 @@ fun ProfileHeader(user: User) {
         modifier = Modifier.size(120.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        // Avatar based on gender
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = CircleShape,
-            color = if (user.gender == "Male") Color(0xFFE0C09E) else Color(0xFFD1B08E),
-            border = androidx.compose.foundation.BorderStroke(2.dp, StichColor.Primary)
+            color = MeshColor.Background,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
         ) {
             Icon(
                 imageVector = Icons.Default.Person,
@@ -141,13 +136,13 @@ fun ProfileHeader(user: User) {
         Surface(
             modifier = Modifier.size(32.dp),
             shape = CircleShape,
-            color = StichColor.Surface,
+            color = MeshColor.Surface,
             tonalElevation = 2.dp
         ) {
             Icon(
                 imageVector = Icons.Default.Verified,
                 contentDescription = "Verified",
-                tint = StichColor.SuccessGreen,
+                tint = MeshColor.SuccessGreen,
                 modifier = Modifier.padding(2.dp)
             )
         }
@@ -158,14 +153,14 @@ fun ProfileHeader(user: User) {
     Text(
         text = user.displayName,
         style = MaterialTheme.typography.headlineSmall,
-        color = StichColor.TextPrimary,
+        color = MeshColor.TextPrimary,
         fontWeight = FontWeight.Bold
     )
     
     Text(
         text = user.nodeName,
         style = MaterialTheme.typography.bodySmall,
-        color = StichColor.Primary,
+        color = MeshColor.Primary,
         fontWeight = FontWeight.Medium,
         letterSpacing = 1.sp
     )
@@ -175,9 +170,9 @@ fun ProfileHeader(user: User) {
 fun CountdownCard(countdownText: String, isLocked: Boolean) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = StichColor.Surface,
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, StichColor.Primary.copy(alpha = 0.5f))
+        color = MeshColor.Surface,
+        tonalElevation = 0.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -187,14 +182,14 @@ fun CountdownCard(countdownText: String, isLocked: Boolean) {
                 Icon(
                     imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.Verified,
                     contentDescription = null,
-                    tint = if (isLocked) StichColor.Primary else StichColor.SuccessGreen,
+                    tint = if (isLocked) MeshColor.Primary else MeshColor.SuccessGreen,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isLocked) "IDENTITY LOCKED" else "IDENTITY STABLE",
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isLocked) StichColor.Primary else StichColor.SuccessGreen,
+                    color = if (isLocked) MeshColor.Primary else MeshColor.SuccessGreen,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -204,7 +199,7 @@ fun CountdownCard(countdownText: String, isLocked: Boolean) {
             Text(
                 text = countdownText,
                 style = MaterialTheme.typography.headlineLarge,
-                color = StichColor.TextPrimary,
+                color = MeshColor.TextPrimary,
                 fontWeight = FontWeight.ExtraBold,
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
             )
@@ -214,7 +209,7 @@ fun CountdownCard(countdownText: String, isLocked: Boolean) {
             Text(
                 text = "REMAINING UNTIL RE-BROADCAST PERMITTED",
                 style = MaterialTheme.typography.bodySmall,
-                color = StichColor.TextSecondary,
+                color = MeshColor.TextSecondary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -227,12 +222,11 @@ fun IdentityDetails(user: User) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(StichColor.Surface, RoundedCornerShape(12.dp))
-            .border(1.dp, StichColor.Border, RoundedCornerShape(12.dp))
+            .background(MeshColor.Surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MeshColor.Border, RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         DetailRow(label = "TACTICAL ROLE", value = user.role.uppercase(), isLast = false)
-        DetailRow(label = "GENDER", value = user.gender.uppercase(), isLast = false)
         DetailRow(label = "ANONYMOUS MODE", value = if (user.isAnonymous) "ENABLED" else "DISABLED", isLast = true)
     }
 }
@@ -243,7 +237,16 @@ fun DetailRow(label: String, value: String, isLast: Boolean) {
         Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
-            .border(bottom = 1.dp, color = StichColor.Border)
+            .then(Modifier.drawBehind {
+                val strokeWidth = 1.dp.toPx()
+                val y = size.height - strokeWidth / 2
+                drawLine(
+                    color = MeshColor.Border,
+                    start = androidx.compose.ui.geometry.Offset(0f, y),
+                    end = androidx.compose.ui.geometry.Offset(size.width, y),
+                    strokeWidth = strokeWidth
+                )
+            })
     } else {
         Modifier
             .fillMaxWidth()
@@ -258,13 +261,13 @@ fun DetailRow(label: String, value: String, isLast: Boolean) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = StichColor.TextSecondary,
+            color = MeshColor.TextSecondary,
             fontWeight = FontWeight.Medium
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
-            color = StichColor.TextPrimary,
+            color = MeshColor.TextPrimary,
             fontWeight = FontWeight.SemiBold
         )
     }
@@ -274,14 +277,13 @@ fun DetailRow(label: String, value: String, isLast: Boolean) {
 fun EditProfileView(
     uiState: ProfileUiState,
     onRoleChange: (String) -> Unit,
-    onGenderChange: (String) -> Unit,
     onAnonymousToggle: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        StichProfileDropdown(
+        MeshProfileDropdown(
             label = "OPERATIONAL ROLE",
             currentRole = uiState.editedRole,
             onRoleSelected = onRoleChange
@@ -289,30 +291,24 @@ fun EditProfileView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        StichProfileGenderSelector(
-            selectedGender = uiState.editedGender,
-            onGenderSelected = onGenderChange
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        StichProfileAnonymousToggle(
+        MeshProfileAnonymousToggle(
             isAnonymous = uiState.editedIsAnonymous,
             onToggle = onAnonymousToggle
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        StichProfileSaveGroup(
-            onClick = onSave
+        MeshProfileSaveGroup(
+            isSaving = uiState.isSaving,
+            onSave = onSave
         )
     }
 }
 
-// --- Stich Components (Duplicated/Adapted for Profile) ---
+// --- Mesh Components (Duplicated/Adapted for Profile) ---
 
 @Composable
-fun StichProfileDropdown(
+fun MeshProfileDropdown(
     label: String,
     currentRole: String,
     onRoleSelected: (String) -> Unit
@@ -325,7 +321,7 @@ fun StichProfileDropdown(
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = StichColor.TextPrimary,
+            color = MeshColor.TextPrimary,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -333,8 +329,8 @@ fun StichProfileDropdown(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .background(StichColor.Surface, RoundedCornerShape(8.dp))
-                .border(1.dp, StichColor.Border, RoundedCornerShape(8.dp))
+                .background(MeshColor.Surface, RoundedCornerShape(8.dp))
+                .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
                 .clickable { expanded = true }
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
@@ -345,25 +341,26 @@ fun StichProfileDropdown(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = currentRole,
-                    color = StichColor.TextPrimary,
-                    style = MaterialTheme.typography.bodyLarge
+                    text = currentRole.uppercase(),
+                    color = MeshColor.TextPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
                 )
                 Icon(
                     imageVector = Icons.Default.ArrowDropDown,
                     contentDescription = null,
-                    tint = StichColor.TextSecondary
+                    tint = MeshColor.TextSecondary
                 )
             }
             
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.background(StichColor.Surface)
+                modifier = Modifier.background(MeshColor.Surface)
             ) {
-                roles.forEach { role ->
+                listOf("Civilian", "Medic", "Rescue", "Utility").forEach { role ->
                     DropdownMenuItem(
-                        text = { Text(role, color = StichColor.TextPrimary) },
+                        text = { Text(role.uppercase(), color = MeshColor.TextPrimary) },
                         onClick = {
                             onRoleSelected(role)
                             expanded = false
@@ -375,105 +372,65 @@ fun StichProfileDropdown(
     }
 }
 
-@Composable
-fun StichProfileGenderSelector(
-    selectedGender: String,
-    onGenderSelected: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "GENDER",
-            style = MaterialTheme.typography.labelMedium,
-            color = StichColor.TextPrimary,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("Male", "Female").forEach { gender ->
-                val isSelected = selectedGender == gender
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .background(
-                            if (isSelected) StichColor.Primary.copy(alpha = 0.2f) else StichColor.Surface,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (isSelected) StichColor.Primary else StichColor.Border,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { onGenderSelected(gender) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = gender.uppercase(),
-                        color = if (isSelected) StichColor.Primary else StichColor.TextSecondary,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-                if (gender == "Male") Spacer(modifier = Modifier.width(8.dp))
-            }
-        }
-    }
-}
 
 @Composable
-fun StichProfileAnonymousToggle(
+fun MeshProfileAnonymousToggle(
     isAnonymous: Boolean,
     onToggle: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(StichColor.Surface, RoundedCornerShape(8.dp))
-            .border(1.dp, StichColor.Border, RoundedCornerShape(8.dp))
-            .padding(16.dp),
+            .height(56.dp)
+            .background(MeshColor.Surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
+            .clickable { onToggle(!isAnonymous) }
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = "ANONYMOUS MODE",
-            color = StichColor.TextPrimary,
+            color = MeshColor.TextPrimary,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Bold
         )
         Switch(
             checked = isAnonymous,
             onCheckedChange = onToggle,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = StichColor.Primary,
-                checkedTrackColor = StichColor.Primary.copy(alpha = 0.5f),
-                uncheckedThumbColor = StichColor.TextSecondary,
-                uncheckedTrackColor = StichColor.Border
+                checkedThumbColor = MeshColor.Primary,
+                checkedTrackColor = MeshColor.Primary.copy(alpha = 0.5f),
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = MeshColor.Border
             )
         )
     }
 }
 
 @Composable
-fun StichProfileSaveGroup(
-    onClick: () -> Unit
+fun MeshProfileSaveGroup(
+    isSaving: Boolean,
+    onSave: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(StichColor.Surface, RoundedCornerShape(16.dp))
-            .border(2.dp, StichColor.Primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .background(MeshColor.Surface, RoundedCornerShape(16.dp))
+            .bottomBorder(2.dp, MeshColor.Primary.copy(alpha = 0.2f))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(StichColor.Primary.copy(alpha = 0.2f), CircleShape),
+                .background(MeshColor.Primary.copy(alpha = 0.2f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.CheckCircle,
+                imageVector = Icons.Default.Security,
                 contentDescription = null,
-                tint = StichColor.Primary,
+                tint = MeshColor.Primary,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -481,43 +438,53 @@ fun StichProfileSaveGroup(
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "Are you sure?",
+            text = "CONFIRM IDENTITY",
             style = MaterialTheme.typography.titleLarge,
-            color = StichColor.TextPrimary,
+            color = MeshColor.TextPrimary,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "This identity will be locked for the next 72 hours across the emergency mesh network.",
+            text = "Your identity will be locked for 72 hours after saving. Ensure all data is correct.",
             style = MaterialTheme.typography.bodySmall,
-            color = StichColor.TextSecondary,
+            color = MeshColor.TextSecondary,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         Button(
-            onClick = onClick,
+            onClick = onSave,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = StichColor.Primary
-            )
+                containerColor = MeshColor.Primary,
+                disabledContainerColor = MeshColor.Primary.copy(alpha = 0.5f)
+            ),
+            enabled = !isSaving
         ) {
-            Text(
-                text = "SAVE & LOCK IDENTITY",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                letterSpacing = 1.sp
-            )
+            if (isSaving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = "SAVE & LOCK IDENTITY",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    letterSpacing = 1.sp
+                )
+            }
         }
     }
 }
 
-private fun Modifier.border(bottom: androidx.compose.ui.unit.Dp, color: Color) = this.drawBehind {
+private fun Modifier.bottomBorder(bottom: androidx.compose.ui.unit.Dp, color: Color) = this.drawBehind {
     val strokeWidth = bottom.toPx()
     val y = size.height - strokeWidth / 2
     drawLine(

@@ -1,8 +1,6 @@
 package com.example.pigeon.data.local.dao
 
-import androidx.room.Dao
-import androidx.room.Query
-import androidx.room.Upsert
+import androidx.room.*
 import com.example.pigeon.data.local.entities.UserEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -19,4 +17,7 @@ interface UserDao {
 
     @Upsert
     suspend fun upsertUser(user: UserEntity)
+
+    @Query("DELETE FROM user_profile")
+    suspend fun clearUser()
 }

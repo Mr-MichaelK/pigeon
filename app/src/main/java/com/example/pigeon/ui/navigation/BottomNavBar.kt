@@ -18,7 +18,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.example.pigeon.ui.theme.StichColor
+import com.example.pigeon.ui.theme.MeshColor
 import androidx.compose.ui.unit.dp
 
 sealed class BottomNavItem(val route: String, val title: String, val icon: ImageVector) {
@@ -29,7 +29,7 @@ sealed class BottomNavItem(val route: String, val title: String, val icon: Image
 }
 
 @Composable
-fun StichBottomNav(navController: NavController) {
+fun MeshBottomNav(navController: NavController) {
     val items = listOf(
         BottomNavItem.Map,
         BottomNavItem.Radar,
@@ -38,8 +38,8 @@ fun StichBottomNav(navController: NavController) {
     )
 
     NavigationBar(
-        containerColor = StichColor.Surface,
-        contentColor = StichColor.TextPrimary,
+        containerColor = MeshColor.Surface,
+        contentColor = MeshColor.TextPrimary,
         tonalElevation = 0.dp
     ) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -53,11 +53,11 @@ fun StichBottomNav(navController: NavController) {
                 label = { Text(item.title) },
                 selected = isSelected,
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = StichColor.Primary,
-                    selectedTextColor = StichColor.Primary,
-                    indicatorColor = StichColor.Primary.copy(alpha = 0.1f),
-                    unselectedIconColor = StichColor.TextSecondary,
-                    unselectedTextColor = StichColor.TextSecondary
+                    selectedIconColor = MeshColor.Primary,
+                    selectedTextColor = MeshColor.Primary,
+                    indicatorColor = MeshColor.Primary.copy(alpha = 0.1f),
+                    unselectedIconColor = MeshColor.TextSecondary,
+                    unselectedTextColor = MeshColor.TextSecondary
                 ),
                 onClick = {
                     navController.navigate(item.route) {

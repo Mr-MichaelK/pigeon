@@ -2,15 +2,12 @@ package com.example.pigeon.data.local.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import java.util.UUID
-
-enum class EventType {
-    WATER, CONFLICT, MEDICAL, SOS, FIRE_HAZARD
-}
+import com.example.pigeon.domain.model.Event
+import com.example.pigeon.domain.model.EventType
 
 @Entity(tableName = "events")
 data class EventEntity(
-    @PrimaryKey val eventId: String = UUID.randomUUID().toString(),
+    @PrimaryKey val eventId: String,
     val creatorDeviceId: String,
     val eventType: EventType,
     val title: String,
@@ -19,5 +16,31 @@ data class EventEntity(
     val longitude: Double,
     val timestamp: Long,
     val isResolved: Boolean = false,
-    val ttl: Long // Time To Live in milliseconds
+    val ttl: Long
+)
+
+fun EventEntity.toDomain(): Event = Event(
+    eventId = eventId,
+    creatorDeviceId = creatorDeviceId,
+    eventType = eventType,
+    title = title,
+    description = description,
+    latitude = latitude,
+    longitude = longitude,
+    timestamp = timestamp,
+    isResolved = isResolved,
+    ttl = ttl
+)
+
+fun Event.toEntity(): EventEntity = EventEntity(
+    eventId = eventId,
+    creatorDeviceId = creatorDeviceId,
+    eventType = eventType,
+    title = title,
+    description = description,
+    latitude = latitude,
+    longitude = longitude,
+    timestamp = timestamp,
+    isResolved = isResolved,
+    ttl = ttl
 )

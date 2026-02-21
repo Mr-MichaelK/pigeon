@@ -30,7 +30,6 @@ class LocalUserRepositoryTest {
         
         val user = User(
             displayName = "Alpha-One",
-            gender = "Male",
             role = "Lead Medic",
             nodeName = "",
             isAnonymous = false,
@@ -47,7 +46,6 @@ class LocalUserRepositoryTest {
         val existingNodeName = "NODE-EXISTING"
         val existingUser = UserEntity(
             displayName = "Old Name",
-            gender = "Female",
             role = "Old Role",
             nodeName = existingNodeName,
             isAnonymous = false,
@@ -57,7 +55,6 @@ class LocalUserRepositoryTest {
         
         val newUser = User(
             displayName = "New Name",
-            gender = "Male",
             role = "New Role",
             nodeName = "", // Should be ignored in favor of existing
             isAnonymous = false,
@@ -76,7 +73,6 @@ class LocalUserRepositoryTest {
         val recentTimestamp = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(10)
         val user = UserEntity(
             displayName = "User",
-            gender = "Male",
             role = "Role",
             nodeName = "Node",
             isAnonymous = false,
@@ -92,7 +88,6 @@ class LocalUserRepositoryTest {
         val oldTimestamp = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(73)
         val user = UserEntity(
             displayName = "User",
-            gender = "Female",
             role = "Role",
             nodeName = "Node",
             isAnonymous = false,
