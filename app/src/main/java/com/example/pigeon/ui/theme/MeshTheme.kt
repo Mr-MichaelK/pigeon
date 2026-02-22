@@ -10,4 +10,8 @@ object MeshColor {
     val TextPrimary = Color(0xFF171511)
     val TextSecondary = Color(0xFF877B64)
     val SuccessGreen = Color(0xFF16A34A)
+    val EmergencyRed = Color(0xFFD65D5D) // Calm Red
+    val MeshBlue = Color(0xFF5B8BDF) // Calm Blue
+    val AlertOrange = Color(0xFFD97706) // Calm Orange
+    val AssistYellow = Color(0xFFD9A536) // Calm Yellow
 }

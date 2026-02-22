@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pigeon.domain.repository.UserRepository
 import com.example.pigeon.ui.screens.onboarding.OnboardingScreen
+import com.example.pigeon.ui.screens.map.MapScreen
 import com.example.pigeon.ui.screens.onboarding.OnboardingViewModel
 import com.example.pigeon.ui.screens.profile.ProfileScreen
 import com.example.pigeon.ui.screens.profile.ProfileViewModel
@@ -71,9 +72,7 @@ fun PigeonNavGraph(
                     )
                 }
                 composable(Screen.Map.route) {
-                    com.example.pigeon.ui.screens.map.MapPlaceholderScreen(
-                        onOpenProfile = { navController.navigate(Screen.Profile.route) }
-                    )
+                    MapScreen()
                 }
                 composable(Screen.Radar.route) {
                     com.example.pigeon.ui.screens.radar.RadarScreen()
