@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -112,7 +111,7 @@ fun MapScreen(
                     symbolManagerState.value = manager
                     
                     enableLocationComponent(map, style, context)
-                    updateSymbols(manager, style, uiState.events, currentZoom >= zoomThreshold) // Pass style
+                    updateSymbols(context, manager, style, uiState.events, currentZoom >= zoomThreshold)
 
                     manager.addClickListener { symbol ->
                         selectedEvent = uiState.events.find { 
@@ -144,7 +143,7 @@ fun MapScreen(
     LaunchedEffect(uiState.events, showTitles) {
         symbolManagerState.value?.let { manager ->
             mapLibreMap?.getStyle { style ->
-                updateSymbols(manager, style, uiState.events, showTitles)
+                updateSymbols(context, manager, style, uiState.events, showTitles)
             }
         }
     }
@@ -470,47 +469,144 @@ private fun enableLocationComponent(map: MapLibreMap, style: Style, context: and
     }
 }
 
-private fun updateSymbols(manager: SymbolManager?, style: Style, events: List<Event>, showTitles: Boolean) {
+private fun updateSymbols(context: android.content.Context, manager: SymbolManager?, style: Style, events: List<Event>, showTitles: Boolean) {
     manager?.deleteAll()
     events.forEach { event ->
-        val iconImage = when (event.eventType) {
-            EventType.FIRE_HAZARD -> "pin-fire"
-            EventType.WATER -> "pin-water"
-            EventType.CONFLICT -> "pin-conflict"
-            EventType.SOS, EventType.MEDICAL -> "pin-sos"
-            else -> "default-pin"
+        val iconVector = when (event.eventType) {
+            EventType.FIRE_HAZARD -> Icons.Outlined.PriorityHigh
+            EventType.WATER -> Icons.Outlined.WaterDrop
+            EventType.CONFLICT -> Icons.Outlined.WarningAmber
+            EventType.SOS, EventType.MEDICAL -> Icons.Outlined.Sos
+            else -> null
+        }
+        
+        val color = when (event.eventType) {
+            EventType.FIRE_HAZARD -> MeshColor.EmergencyRed
+            EventType.WATER -> MeshColor.MeshBlue
+            EventType.CONFLICT -> MeshColor.AlertOrange
+            EventType.SOS, EventType.MEDICAL -> MeshColor.AssistYellow
+            else -> MeshColor.TextSecondary
         }
 
-        // 1. Create Icon Symbol
-        manager?.create(
-            SymbolOptions()
-                .withLatLng(LatLng(event.latitude, event.longitude))
-                .withIconImage(iconImage)
-                .withIconSize(1.0f)
-        )
-
-        // 2. Create Label Symbol if zoomed in
-        if (showTitles) {
-            val labelTitle = event.title.uppercase()
-            val labelImageId = "label-${event.eventId}"
-            
-            // Generate and register label bitmap if not already in style
-            if (style.getImage(labelImageId) == null) {
-                createLabelPillBitmap(labelTitle)?.let { 
-                    style.addImage(labelImageId, it) 
+        if (showTitles && iconVector != null) {
+            // COMBINED VIEW: Icon + Label welded together
+            val combinedId = "combined-${event.eventId}"
+            if (style.getImage(combinedId) == null) {
+                createCombinedPinBitmap(context, iconVector, color, event.title.uppercase())?.let {
+                    style.addImage(combinedId, it)
                 }
             }
 
             manager?.create(
                 SymbolOptions()
                     .withLatLng(LatLng(event.latitude, event.longitude))
-                    .withIconImage(labelImageId)
+                    .withIconImage(combinedId)
                     .withIconAnchor(Property.ICON_ANCHOR_TOP)
-                    .withIconOffset(arrayOf(0f, 40f)) // Offset to sit comfortably below the pin
+                    .withIconOffset(arrayOf(0f, -0.5f)) // Anchor to top but offset so circle is on coord
+                    .withIconSize(1.0f)
+            )
+        } else {
+            // ICON ONLY VIEW
+            val iconImage = when (event.eventType) {
+                EventType.FIRE_HAZARD -> "pin-fire"
+                EventType.WATER -> "pin-water"
+                EventType.CONFLICT -> "pin-conflict"
+                EventType.SOS, EventType.MEDICAL -> "pin-sos"
+                else -> "default-pin"
+            }
+
+            manager?.create(
+                SymbolOptions()
+                    .withLatLng(LatLng(event.latitude, event.longitude))
+                    .withIconImage(iconImage)
                     .withIconSize(1.0f)
             )
         }
     }
+}
+
+private fun createCombinedPinBitmap(
+    context: android.content.Context,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    backgroundColor: Color,
+    text: String
+): Bitmap? {
+    // 1. Measure Text Pill
+    val textPaint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#171511")
+        textSize = 32f
+        typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+        textAlign = android.graphics.Paint.Align.CENTER
+    }
+    
+    val hPadding = 32f
+    val vPadding = 20f
+    val textBounds = android.graphics.Rect()
+    textPaint.getTextBounds(text, 0, text.length, textBounds)
+    val pillW = textBounds.width() + (hPadding * 2)
+    val pillH = textBounds.height() + (vPadding * 2)
+    
+    // 2. Icon Circle Dimens
+    val circleSize = 120f
+    val overlap = 8f
+    
+    // 3. Total Dimens
+    val totalW = Math.max(circleSize, pillW)
+    val totalH = circleSize + pillH - overlap
+    
+    val bitmap = Bitmap.createBitmap(totalW.toInt(), totalH.toInt(), Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    
+    // Position Circle at horizontal center
+    val circleX = totalW / 2f
+    val circleY = circleSize / 2f
+    
+    // Draw Circle
+    paint.color = backgroundColor.toArgb()
+    paint.style = android.graphics.Paint.Style.FILL
+    canvas.drawCircle(circleX, circleY, circleSize / 2f, paint)
+    
+    paint.style = android.graphics.Paint.Style.STROKE
+    paint.strokeWidth = 6f
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(circleX, circleY, (circleSize / 2f) - 3f, paint)
+    
+    // Draw Icon inside Circle
+    val iconSize = circleSize * 0.55f
+    val iconLeft = circleX - (iconSize / 2f)
+    val iconTop = circleY - (iconSize / 2f)
+    val scale = iconSize / icon.defaultWidth.value
+
+    canvas.save()
+    canvas.translate(iconLeft, iconTop)
+    canvas.scale(scale, scale)
+    val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = android.graphics.Paint.Style.FILL
+    }
+    
+    drawVectorPaths(icon.root, canvas, iconPaint)
+    canvas.restore()
+    
+    // Draw Pill below Circle
+    val pillX = (totalW - pillW) / 2f
+    val pillY = circleSize - overlap
+    val rect = android.graphics.RectF(pillX, pillY, pillX + pillW, pillY + pillH)
+    
+    paint.style = android.graphics.Paint.Style.FILL
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawRoundRect(rect, 24f, 24f, paint)
+    
+    paint.style = android.graphics.Paint.Style.STROKE
+    paint.strokeWidth = 2f
+    paint.color = android.graphics.Color.parseColor("#E5E0D6")
+    canvas.drawRoundRect(rect, 24f, 24f, paint)
+    
+    val textY = pillY + (pillH / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+    canvas.drawText(text, totalW / 2f, textY, textPaint)
+    
+    return bitmap
 }
 
 private fun drawableToBitmap(context: android.content.Context, drawableId: Int): Bitmap? {
@@ -562,90 +658,7 @@ private fun createTacticalPinBitmap(
         style = android.graphics.Paint.Style.FILL
     }
 
-    fun recursiveDraw(group: androidx.compose.ui.graphics.vector.VectorGroup) {
-        canvas.save()
-        // Apply group transforms if any
-        canvas.translate(group.translationX, group.translationY)
-        canvas.rotate(group.rotation, group.pivotX, group.pivotY)
-        canvas.scale(group.scaleX, group.scaleY, group.pivotX, group.pivotY)
-
-        group.forEach { node ->
-            when (node) {
-                is androidx.compose.ui.graphics.vector.VectorGroup -> recursiveDraw(node)
-                is androidx.compose.ui.graphics.vector.VectorPath -> {
-                    val androidPath = android.graphics.Path()
-                    var lastX = 0f
-                    var lastY = 0f
-                    node.pathData.forEach { p ->
-                        when (p) {
-                            is androidx.compose.ui.graphics.vector.PathNode.MoveTo -> {
-                                androidPath.moveTo(p.x, p.y)
-                                lastX = p.x
-                                lastY = p.y
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.RelativeMoveTo -> {
-                                androidPath.rMoveTo(p.dx, p.dy)
-                                lastX += p.dx
-                                lastY += p.dy
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.LineTo -> {
-                                androidPath.lineTo(p.x, p.y)
-                                lastX = p.x
-                                lastY = p.y
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.RelativeLineTo -> {
-                                androidPath.rLineTo(p.dx, p.dy)
-                                lastX += p.dx
-                                lastY += p.dy
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.HorizontalTo -> {
-                                androidPath.lineTo(p.x, lastY)
-                                lastX = p.x
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.RelativeHorizontalTo -> {
-                                androidPath.rLineTo(p.dx, 0f)
-                                lastX += p.dx
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.VerticalTo -> {
-                                androidPath.lineTo(lastX, p.y)
-                                lastY = p.y
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.RelativeVerticalTo -> {
-                                androidPath.rLineTo(0f, p.dy)
-                                lastY += p.dy
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.CurveTo -> {
-                                androidPath.cubicTo(p.x1, p.y1, p.x2, p.y2, p.x3, p.y3)
-                                lastX = p.x3
-                                lastY = p.y3
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.RelativeCurveTo -> {
-                                androidPath.rCubicTo(p.dx1, p.dy1, p.dx2, p.dy2, p.dx3, p.dy3)
-                                lastX += p.dx3
-                                lastY += p.dy3
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.QuadTo -> {
-                                androidPath.quadTo(p.x1, p.y1, p.x2, p.y2)
-                                lastX = p.x2
-                                lastY = p.y2
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.RelativeQuadTo -> {
-                                androidPath.rQuadTo(p.dx1, p.dy1, p.dx2, p.dy2)
-                                lastX += p.dx2
-                                lastY += p.dy2
-                            }
-                            is androidx.compose.ui.graphics.vector.PathNode.Close -> androidPath.close()
-                            else -> {}
-                        }
-                    }
-                    canvas.drawPath(androidPath, iconPaint)
-                }
-            }
-        }
-        canvas.restore()
-    }
-
-    recursiveDraw(icon.root)
+    drawVectorPaths(icon.root, canvas, iconPaint)
     canvas.restore()
     
     return bitmap
@@ -689,6 +702,94 @@ private fun createLabelPillBitmap(text: String): Bitmap? {
     canvas.drawText(text, width / 2f, textY, paint)
 
     return bitmap
+}
+
+private fun drawVectorPaths(
+    group: androidx.compose.ui.graphics.vector.VectorGroup,
+    canvas: Canvas,
+    paint: android.graphics.Paint
+) {
+    canvas.save()
+    canvas.translate(group.translationX, group.translationY)
+    canvas.rotate(group.rotation, group.pivotX, group.pivotY)
+    canvas.scale(group.scaleX, group.scaleY, group.pivotX, group.pivotY)
+
+    group.forEach { node ->
+        when (node) {
+            is androidx.compose.ui.graphics.vector.VectorGroup -> {
+                drawVectorPaths(node, canvas, paint)
+            }
+            is androidx.compose.ui.graphics.vector.VectorPath -> {
+                val path = android.graphics.Path()
+                var lastX = 0f
+                var lastY = 0f
+                node.pathData.forEach { p ->
+                    when (p) {
+                        is androidx.compose.ui.graphics.vector.PathNode.MoveTo -> {
+                            path.moveTo(p.x, p.y)
+                            lastX = p.x
+                            lastY = p.y
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.RelativeMoveTo -> {
+                            path.rMoveTo(p.dx, p.dy)
+                            lastX += p.dx
+                            lastY += p.dy
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.LineTo -> {
+                            path.lineTo(p.x, p.y)
+                            lastX = p.x
+                            lastY = p.y
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.RelativeLineTo -> {
+                            path.rLineTo(p.dx, p.dy)
+                            lastX += p.dx
+                            lastY += p.dy
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.HorizontalTo -> {
+                            path.lineTo(p.x, lastY)
+                            lastX = p.x
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.RelativeHorizontalTo -> {
+                            path.rLineTo(p.dx, 0f)
+                            lastX += p.dx
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.VerticalTo -> {
+                            path.lineTo(lastX, p.y)
+                            lastY = p.y
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.RelativeVerticalTo -> {
+                            path.rLineTo(0f, p.dy)
+                            lastY += p.dy
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.CurveTo -> {
+                            path.cubicTo(p.x1, p.y1, p.x2, p.y2, p.x3, p.y3)
+                            lastX = p.x3
+                            lastY = p.y3
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.RelativeCurveTo -> {
+                            path.rCubicTo(p.dx1, p.dy1, p.dx2, p.dy2, p.dx3, p.dy3)
+                            lastX += p.dx3
+                            lastY += p.dy3
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.QuadTo -> {
+                            path.quadTo(p.x1, p.y1, p.x2, p.y2)
+                            lastX = p.x2
+                            lastY = p.y2
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.RelativeQuadTo -> {
+                            path.rQuadTo(p.dx1, p.dy1, p.dx2, p.dy2)
+                            lastX += p.dx2
+                            lastY += p.dy2
+                        }
+                        is androidx.compose.ui.graphics.vector.PathNode.Close -> path.close()
+                        else -> {}
+                    }
+                }
+                canvas.drawPath(path, paint)
+            }
+        }
+    }
+    canvas.restore()
 }
 
 private fun Color.toArgb(): Int = (value shr 32).toInt()
