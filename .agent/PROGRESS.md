@@ -44,9 +44,9 @@
 - [x] **Reviewer:** Confirm the "Timeline Rail" in the Log screen matches the UX spec.
 
 ### Task 2.3: Multi-Step Reporting Wizard
-- [ ] **Architect:** Design the state machine for the 3-step reporting flow.
-- [ ] **Coder:** Build the Reporting Bottom Sheet. Note: Broadcast action should only update local DB for now.
-- [ ] **Reviewer:** Test "Two-Tap" efficiency for reporting under stress.
+- [x] **Architect:** Design the state machine for the 3-step reporting flow.
+- [x] **Coder:** Build the Reporting Bottom Sheet. Note: Broadcast action should only update local DB for now.
+- [x] **Reviewer:** Test "Two-Tap" efficiency for reporting under stress.
 
 ## 🟢 PHASE 3: Peer Discovery UI (Radar Only) (COMPLETED)
 ### Task 3.1: Visual Radar & Peer Discovery
@@ -55,6 +55,48 @@
 - [x] **Reviewer:** Audit Radio Hygiene (OFF state) and Canvas performance.
 
 ## 🔴 PHASE 4: Networking & Real-Time Sync (FUTURE)
-- [ ] Implement Google Nearby Connections wrapper.
-- [ ] Event-Driven "Ping" logic (Wake-up signal on broadcast).
-- [ ] Set Union Algorithm for DB delta exchange.
+### Task 4.1: Sync/Exchange Layer (Google Nearby Connections)
+
+- [] **Architect:** Design the NearbySyncManager to handle P2P_CLUSTER topology and multi-peer discovery.
+
+- [] **Coder:** Implement the Google Nearby Connections wrapper for BLE (Discovery/Advertising) and Wi-Fi Direct (High-speed transfer).
+
+- [] **Coder:** Integrate Protocol Buffers (Protobuf) for compact binary serialization of Event and Manifest payloads.
+
+- [] **Reviewer:** Audit "Radio Hygiene" to ensure Wi-Fi Direct is only invoked for payloads > 32KB.
+
+### Task 4.2: The "Set Union" Engine (Delta Exchange)
+
+- [] **Architect:** Define the Manifest Exchange Protocol (comparing lists of unique Event IDs and hashes between nodes).
+
+- [] **Coder:** Implement the Set Union Algorithm using Room's EXCEPT or NOT IN queries to identify missing "deltas".
+
+- [] **Coder:** Build the Delta Transfer logic to specifically request and append missing records to the local immutable ledger.
+
+- [] **Reviewer:** Verify that incoming data is appended as new records and never overwrites existing local data (Eventual Consistency).
+
+### Task 4.3: Control Layer (3-State Power & "Ping" Logic)
+
+- [] **Architect:** Formalize the State Machine transitions: OFF ↔ PASSIVE (BLE) ↔ ACTIVE (Wi-Fi).
+
+- [] **Coder:** Implement the Event-Driven "Ping": automatically trigger a broadcast when a new report is saved to the local DB.
+
+- [] **Coder:** Implement the "Wake-up" Frame logic and the 60-second "Race to Sleep" timer to return the device to a passive state after sync.
+
+- [] **Reviewer:** Conduct battery-drain testing to ensure background scanning stays below the 5% per hour target.
+
+### Task 4.4: Data Lifecycle & Integrity
+
+- [] **Architect:** Design the Purge Controller logic for automatic cleanup based on user-defined TTL (Time-to-Live).
+
+- [] **Coder:** Implement the WorkManager background task to monitor and delete expired events from the Room DB.
+
+- [] **Coder:** Implement the Sidecar Verification logic, allowing nodes to "Verify" or "Contradict" events via signed delta records.
+
+- [] **Reviewer:** Ensure the 72-hour Identity Lock correctly prevents profile changes from affecting existing mesh signatures.
+
+### Task 4.5: Multi-Device Mesh Validation
+
+- [] **Coder:** Implement RSSI-based distance math to populate the Radar UI with real-time peer proximity.
+
+- [] **Reviewer:** Perform Field/Mesh Testing with at least three physical devices to simulate opportunistic "Store-and-Forward" propagation.
