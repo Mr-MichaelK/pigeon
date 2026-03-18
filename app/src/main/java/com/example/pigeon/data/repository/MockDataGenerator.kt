@@ -45,6 +45,7 @@ class MockDataGenerator @Inject constructor() {
             EventType.MEDICAL -> "Medical Assistance"
             EventType.SUPPLIES -> "Package Supply Spotted"
             EventType.CONFLICT -> "Conflict Alert"
+            EventType.SOS -> "SOS SIGNAL"
             EventType.CUSTOM -> "POI Recorded"
         }
     }
@@ -55,6 +56,7 @@ class MockDataGenerator @Inject constructor() {
             EventType.MEDICAL -> "Casualties reported near checkpoint."
             EventType.SUPPLIES -> "Rations and water surplus spotted."
             EventType.CONFLICT -> "Ongoing engagement in central sector."
+            EventType.SOS -> "CRITICAL EMERGENCY - IMMEDIATE ASSISTANCE REQUIRED."
             EventType.CUSTOM -> "Manual observation logged."
         }
     }

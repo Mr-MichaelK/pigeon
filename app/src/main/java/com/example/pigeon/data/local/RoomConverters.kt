@@ -10,7 +10,11 @@ class RoomConverters {
     }
 
     @TypeConverter
-    fun toEventType(value: String): EventType {
-        return EventType.valueOf(value)
+    fun toEventType(value: String?): EventType {
+        return try {
+            if (value == null) EventType.CUSTOM else EventType.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            EventType.CUSTOM
+        }
     }
 }

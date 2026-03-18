@@ -67,6 +67,7 @@ fun EventDetailSheet(
                     EventType.MEDICAL -> R.drawable.medical_services_24dp to MeshColor.EmergencyRed
                     EventType.SUPPLIES -> R.drawable.package_2_24dp to MeshColor.MeshBlue
                     EventType.CONFLICT -> R.drawable.warning_24dp to MeshColor.AlertOrange
+                    EventType.SOS -> R.drawable.warning_24dp to MeshColor.EmergencyRed
                     EventType.CUSTOM -> R.drawable.location_on_24dp to MeshColor.AssistYellow
                 }
                 Surface(

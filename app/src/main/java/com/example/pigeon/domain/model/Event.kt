@@ -1,7 +1,7 @@
 package com.example.pigeon.domain.model
 
 enum class EventType {
-    FIRE, MEDICAL, SUPPLIES, CONFLICT, CUSTOM
+    FIRE, MEDICAL, SUPPLIES, CONFLICT, CUSTOM, SOS
 }
 
 /**

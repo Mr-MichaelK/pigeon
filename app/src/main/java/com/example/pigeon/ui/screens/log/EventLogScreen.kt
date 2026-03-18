@@ -313,6 +313,7 @@ fun EventTypeBadge(type: EventType) {
         EventType.MEDICAL -> MeshColor.EmergencyRed to "MEDICAL"
         EventType.SUPPLIES -> MeshColor.MeshBlue to "SUPPLIES"
         EventType.CONFLICT -> MeshColor.AlertOrange to "CONFLICT"
+        EventType.SOS -> MeshColor.EmergencyRed to "SOS"
         EventType.CUSTOM -> MeshColor.AssistYellow to "OTHER"
     }
 

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -106,11 +107,11 @@ fun MapScreen(
                     val customPin = createTacticalPinFromDrawable(context, R.drawable.location_on_24dp, MeshColor.AssistYellow)
                     val defaultPin = drawableToBitmap(context, R.drawable.ic_default_pin)
 
-                    firePin?.let { style.addImage("pin-fire", it) }
-                    medicalPin?.let { style.addImage("pin-medical", it) }
-                    suppliesPin?.let { style.addImage("pin-supplies", it) }
-                    conflictPin?.let { style.addImage("pin-conflict", it) }
-                    customPin?.let { style.addImage("pin-custom", it) }
+                    style.addImage("pin-fire", firePin)
+                    style.addImage("pin-medical", medicalPin)
+                    style.addImage("pin-supplies", suppliesPin)
+                    style.addImage("pin-conflict", conflictPin)
+                    style.addImage("pin-custom", customPin)
                     defaultPin?.let { style.addImage("default-pin", it) }
 
                     val manager = SymbolManager(this@apply, map, style).apply {
@@ -468,7 +469,7 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
             EventType.MEDICAL -> R.drawable.medical_services_24dp
             EventType.SUPPLIES -> R.drawable.package_2_24dp
             EventType.CONFLICT -> R.drawable.warning_24dp
-            EventType.CUSTOM -> R.drawable.location_on_24dp
+            EventType.CUSTOM, EventType.SOS -> R.drawable.location_on_24dp
         }
         
         val color = when (event.eventType) {
@@ -476,7 +477,7 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
             EventType.MEDICAL -> MeshColor.EmergencyRed
             EventType.SUPPLIES -> MeshColor.MeshBlue
             EventType.CONFLICT -> MeshColor.AlertOrange
-            EventType.CUSTOM -> MeshColor.AssistYellow
+            EventType.CUSTOM, EventType.SOS -> MeshColor.AssistYellow
         }
 
         if (showTitles) {
@@ -498,13 +499,13 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
             )
         } else {
             // ICON ONLY VIEW
-            val iconImage = when (event.eventType) {
-                EventType.FIRE -> "pin-fire"
-                EventType.MEDICAL -> "pin-medical"
-                EventType.SUPPLIES -> "pin-supplies"
-                EventType.CONFLICT -> "pin-conflict"
-                EventType.CUSTOM -> "pin-custom"
-            }
+                val iconImage = when (event.eventType) {
+                    EventType.FIRE -> "pin-fire"
+                    EventType.MEDICAL -> "pin-medical"
+                    EventType.SUPPLIES -> "pin-supplies"
+                    EventType.CONFLICT -> "pin-conflict"
+                    EventType.CUSTOM, EventType.SOS -> "pin-custom"
+                }
 
             manager?.create(
                 SymbolOptions()
@@ -524,7 +525,7 @@ private fun createCombinedPinFromDrawable(
 ): Bitmap? {
     // 1. Measure Text Pill
     val textPaint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.parseColor("#171511")
+        color = "#171511".toColorInt()
         textSize = 32f
         typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
         textAlign = android.graphics.Paint.Align.CENTER
@@ -546,7 +547,7 @@ private fun createCombinedPinFromDrawable(
     val totalH = circleSize + pillH - overlap
     
     val bitmap = Bitmap.createBitmap(totalW.toInt(), totalH.toInt(), Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
+    val canvas = android.graphics.Canvas(bitmap)
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
     
     // Position Circle at horizontal center
@@ -585,7 +586,7 @@ private fun createCombinedPinFromDrawable(
     
     paint.style = android.graphics.Paint.Style.STROKE
     paint.strokeWidth = 2f
-    paint.color = android.graphics.Color.parseColor("#E5E0D6")
+    paint.color = "#E5E0D6".toColorInt()
     canvas.drawRoundRect(rect, 24f, 24f, paint)
     
     val textY = pillY + (pillH / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
@@ -611,7 +612,7 @@ private fun createTacticalPinFromDrawable(
     context: android.content.Context,
     drawableId: Int,
     backgroundColor: Color
-): Bitmap? {
+): Bitmap {
     val sizePx = 120
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
@@ -641,7 +642,7 @@ private fun createTacticalPinFromDrawable(
 
 private fun createLabelPillBitmap(text: String): Bitmap? {
     val paint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.parseColor("#171511") // Tactical Black
+        color = "#171511".toColorInt() // Tactical Black
         textSize = 32f // High-res source size
         typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
         textAlign = android.graphics.Paint.Align.CENTER
@@ -670,7 +671,7 @@ private fun createLabelPillBitmap(text: String): Bitmap? {
     // Add subtle tactical border
     bgPaint.style = android.graphics.Paint.Style.STROKE
     bgPaint.strokeWidth = 2f
-    bgPaint.color = android.graphics.Color.parseColor("#E5E0D6")
+    bgPaint.color = "#E5E0D6".toColorInt()
     canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
 
     val textY = (height / 2f) - ((paint.descent() + paint.ascent()) / 2f)

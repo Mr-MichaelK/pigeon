@@ -112,6 +112,7 @@ private fun StageOne(
         Triple(EventType.MEDICAL, R.drawable.medical_services_24dp, "MEDICAL"),
         Triple(EventType.SUPPLIES, R.drawable.package_2_24dp, "SUPPLIES"),
         Triple(EventType.CONFLICT, R.drawable.warning_24dp, "CONFLICT"),
+        Triple(EventType.SOS, R.drawable.warning_24dp, "SOS"),
         Triple(EventType.CUSTOM, R.drawable.location_on_24dp, "OTHER")
     )
 
@@ -246,6 +247,7 @@ private fun StageTwo(
                 EventType.MEDICAL -> R.drawable.medical_services_24dp to "MEDICAL"
                 EventType.SUPPLIES -> R.drawable.package_2_24dp to "SUPPLIES"
                 EventType.CONFLICT -> R.drawable.warning_24dp to "CONFLICT"
+                EventType.SOS -> R.drawable.warning_24dp to "SOS"
                 EventType.CUSTOM -> R.drawable.location_on_24dp to "OTHER"
             }
             Icon(
