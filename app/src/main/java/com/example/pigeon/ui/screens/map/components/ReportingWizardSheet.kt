@@ -202,7 +202,10 @@ private fun StageOne(
             enabled = selectedType != null,
             modifier = Modifier.weight(1f).height(56.dp),
             shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MeshColor.TextPrimary)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MeshColor.TextPrimary,
+                disabledContainerColor = MeshColor.TextPrimary.copy(alpha = 0.38f)
+            )
         ) {
             Text("NEXT", fontWeight = FontWeight.Bold, color = Color.White)
         }
@@ -271,7 +274,9 @@ private fun StageTwo(
         shape = RoundedCornerShape(8.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MeshColor.Primary,
-            unfocusedBorderColor = MeshColor.Border
+            unfocusedBorderColor = MeshColor.Border,
+            focusedTextColor = MeshColor.TextPrimary,
+            unfocusedTextColor = MeshColor.TextPrimary
         )
     )
 
@@ -285,7 +290,9 @@ private fun StageTwo(
         shape = RoundedCornerShape(8.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MeshColor.Primary,
-            unfocusedBorderColor = MeshColor.Border
+            unfocusedBorderColor = MeshColor.Border,
+            focusedTextColor = MeshColor.TextPrimary,
+            unfocusedTextColor = MeshColor.TextPrimary
         )
     )
 
@@ -320,16 +327,19 @@ private fun StageTwo(
             modifier = Modifier.weight(1f).height(56.dp),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Text("BACK", fontWeight = FontWeight.Bold, color = MeshColor.TextSecondary)
+            Text("BACK", fontWeight = FontWeight.Black, color = MeshColor.TextSecondary)
         }
         Button(
             onClick = onConfirm,
             enabled = title.isNotBlank(),
             modifier = Modifier.weight(1f).height(56.dp),
             shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MeshColor.SuccessGreen)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MeshColor.Primary,
+                disabledContainerColor = MeshColor.Primary.copy(alpha = 0.38f)
+            )
         ) {
-            Text("CONFIRM REPORT", fontWeight = FontWeight.Bold, color = Color.White)
+            Text("CONFIRM REPORT", fontWeight = FontWeight.Black, color = Color.White)
         }
     }
 }
