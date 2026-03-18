@@ -1,29 +1,33 @@
-# PLAN: Launch Refinement & Data Persistence (Task 2.13)
+# PLAN: Tactical Event Detail Sheet (Task 2.14)
 
-Transition the app from a mock-heavy development state to a persistent, user-location-focused utility.
+Unify the UI by reworking the Map's event details to match the `ReportingWizardSheet` aesthetic.
 
-## 1. Data Logic Cleanup
-- **`MapViewModel.kt`**:
-    - Remove `eventRepository.populateMockData()` from the `init` block to prevent automatic data generation on every map launch.
-- **`EventLogViewModel.kt`**:
-    - Remove `eventRepository.populateMockData()` from the `init` block.
-    - Ensure `loadEvents()` (or equivalent reactive flow) is properly initiated to show existing data from the database.
+## 1. Component Implementation
+- **[NEW] `EventDetailSheet.kt`**:
+    - **Base**: `ModalBottomSheet` with `MeshColor.Background`.
+    - **Sections**:
+        - **Header**: Large Title + Status Badge (`LIVE` / `RESOLVED`).
+        - **Identity Card**: Display `EventType` with its corresponding icon and color theme.
+        - **Description**: Clear body text for the report details.
+        - **Metadata Grid**: Tactical pills for:
+            - **Location**: `45.1234° N, 34.5678° E`
+            - **Origin**: `Device: ABC...123` (Truncated)
+            - **Timeline**: `Created: 14:20` | `TTL: 6h remaining`
+        - **Action**: A high-impact "RESOLVE INCIDENT" button.
 
-## 2. Map Launch Experience
+## 2. Integration
 - **`MapScreen.kt`**:
-    - Implement a "First-Time Zoom" logic:
-        - Add a state variable `var hasInitialZoomed by remember { mutableStateOf(false) }`.
-        - Inside a `LaunchedEffect(mapLibreMap)` or within the location update listener:
-            - If `!hasInitialZoomed` and `locationComponent.lastKnownLocation` is available:
-                - Animate the camera to the user's current coordinates.
-                - Set `hasInitialZoomed = true`.
+    - Remove the legacy `EventDetailSheet` implementation.
+    - Import and use the new `EventDetailSheet` component.
+    - Ensure the sheet is triggered when `selectedEvent` is non-null.
+    - Link the "Resolve" action to `MapViewModel.onResolveEvent`.
 
-## 3. Event Log Data Flow
-- **`EventLogViewModel.kt`**:
-    - Refactor `uiState` to be a pure reactive `StateFlow` combining filters and the repository's event flow. This ensures it always reflects the current database state without manual triggers.
+## 3. Logic Refinements
+- **Color Mapping**: Map `EventType` to specific colors (e.g., Red for Fire, Green for Supplies) to provide instant visual context.
+- **Truncation**: Implement a utility to truncate long Device IDs for the tactical display.
 
 ## 4. Verification Plan
 - **Manual Verification**:
-    - **Data Persistence**: Open the app, create a report, close the app totally, and reopen. Verify the report still exists and no *new* random events are created.
-    - **Auto-Zoom**: Clear app data or move location in emulator, then launch app. Verify the map automatically centers on the current "blue dot" location.
-    - **Event Log**: Confirm that manual reports appear in the log screen immediately.
+    - Click on various incident pins (Fire, Medical, etc.) and verify the sheet renders all metadata correctly.
+    - Confirm the "Resolve" button updates the event status and the sheet reflects the "RESOLVED" state.
+    - Check the visual consistency between the reporting wizard and this detail sheet.

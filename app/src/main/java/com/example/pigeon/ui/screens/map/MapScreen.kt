@@ -40,6 +40,7 @@ import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.ui.screens.map.components.LatLongPill
 import com.example.pigeon.ui.screens.map.components.ReportingWizardSheet
+import com.example.pigeon.ui.screens.map.components.EventDetailSheet
 import com.example.pigeon.ui.theme.MeshColor
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -282,12 +283,12 @@ fun MapScreen(
                 }
             }
 
-            // Event Detail Sheet Placeholder
-            if (selectedEvent != null) {
+            // Event Detail Sheet
+            selectedEvent?.let { event ->
                 EventDetailSheet(
-                    event = selectedEvent!!,
-                    onClose = { selectedEvent = null },
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                    event = event,
+                    onDismiss = { selectedEvent = null },
+                    onResolve = viewModel::onResolveEvent
                 )
             }
 
@@ -441,61 +442,7 @@ fun ToolStack(
     }
 }
 
-@Composable
-fun EventDetailSheet(
-    event: Event,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        color = MeshColor.Surface,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        shadowElevation = 8.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = event.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MeshColor.TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Close", modifier = Modifier.size(24.dp))
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "TYPE: ${event.eventType}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MeshColor.Primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = event.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MeshColor.TextPrimary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { /* TODO: Resolve */ },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MeshColor.Primary)
-            ) {
-                Text("RESOLVE INCIDENT", color = MeshColor.Background)
-            }
-        }
-    }
-}
+// Legacy EventDetailSheet removed in favor of standalone component
 
 @SuppressLint("MissingPermission")
 private fun enableLocationComponent(map: MapLibreMap, style: Style, context: android.content.Context) {

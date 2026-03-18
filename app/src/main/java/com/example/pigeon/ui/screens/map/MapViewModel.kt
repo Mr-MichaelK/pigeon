@@ -92,4 +92,10 @@ class MapViewModel @Inject constructor(
             )
         }
     }
+
+    fun onResolveEvent(eventId: String) {
+        viewModelScope.launch {
+            eventRepository.resolveEvent(eventId)
+        }
+    }
 }
