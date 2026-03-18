@@ -36,6 +36,7 @@ import com.example.pigeon.R
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.ui.screens.map.components.LatLongPill
+import com.example.pigeon.ui.screens.map.components.ReportingWizardSheet
 import com.example.pigeon.ui.theme.MeshColor
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -60,6 +61,7 @@ fun MapScreen(
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     val symbolManagerState = remember { mutableStateOf<SymbolManager?>(null) }
     var selectedEvent by remember { mutableStateOf<Event?>(null) }
+    var showReportingWizard by remember { mutableStateOf(false) }
     
     // Threshold for showing titles
     val zoomThreshold = 14.0
@@ -92,16 +94,18 @@ fun MapScreen(
                 mapLibreMap = map
                 map.setStyle("https://demotiles.maplibre.org/style.json") { style ->
                     // Register dynamic tactical pins
-                    val firePin = createTacticalPinBitmap(context, Icons.Outlined.PriorityHigh, MeshColor.EmergencyRed)
-                    val waterPin = createTacticalPinBitmap(context, Icons.Outlined.WaterDrop, MeshColor.MeshBlue)
-                    val conflictPin = createTacticalPinBitmap(context, Icons.Outlined.WarningAmber, MeshColor.AlertOrange)
-                    val sosPin = createTacticalPinBitmap(context, Icons.Outlined.Sos, MeshColor.AssistYellow)
+                    val firePin = createTacticalPinFromDrawable(context, R.drawable.local_fire_department_24dp, MeshColor.EmergencyRed)
+                    val medicalPin = createTacticalPinFromDrawable(context, R.drawable.medical_services_24dp, MeshColor.EmergencyRed)
+                    val suppliesPin = createTacticalPinFromDrawable(context, R.drawable.package_2_24dp, MeshColor.MeshBlue)
+                    val conflictPin = createTacticalPinFromDrawable(context, R.drawable.warning_24dp, MeshColor.AlertOrange)
+                    val customPin = createTacticalPinFromDrawable(context, R.drawable.location_on_24dp, MeshColor.AssistYellow)
                     val defaultPin = drawableToBitmap(context, R.drawable.ic_default_pin)
 
                     firePin?.let { style.addImage("pin-fire", it) }
-                    waterPin?.let { style.addImage("pin-water", it) }
+                    medicalPin?.let { style.addImage("pin-medical", it) }
+                    suppliesPin?.let { style.addImage("pin-supplies", it) }
                     conflictPin?.let { style.addImage("pin-conflict", it) }
-                    sosPin?.let { style.addImage("pin-sos", it) }
+                    customPin?.let { style.addImage("pin-custom", it) }
                     defaultPin?.let { style.addImage("default-pin", it) }
 
                     val manager = SymbolManager(this@apply, map, style).apply {
@@ -217,7 +221,6 @@ fun MapScreen(
                 )
             }
 
-            // Bottom Actions (Large Buttons)
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -226,7 +229,7 @@ fun MapScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(
-                    onClick = { /* TODO: Reporting Wizard */ },
+                    onClick = { showReportingWizard = true },
                     modifier = Modifier
                         .height(64.dp)
                         .weight(1f),
@@ -255,6 +258,17 @@ fun MapScreen(
                     event = selectedEvent!!,
                     onClose = { selectedEvent = null },
                     modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+
+            if (showReportingWizard) {
+                ReportingWizardSheet(
+                    onDismiss = { showReportingWizard = false },
+                    onReport = { type, title, desc, ttlHours ->
+                        viewModel.reportEvent(type, title, desc, ttlHours * 60 * 60 * 1000)
+                    },
+                    currentLatitude = uiState.metadata.latitude,
+                    currentLongitude = uiState.metadata.longitude
                 )
             }
         }
@@ -472,27 +486,27 @@ private fun enableLocationComponent(map: MapLibreMap, style: Style, context: and
 private fun updateSymbols(context: android.content.Context, manager: SymbolManager?, style: Style, events: List<Event>, showTitles: Boolean) {
     manager?.deleteAll()
     events.forEach { event ->
-        val iconVector = when (event.eventType) {
-            EventType.FIRE_HAZARD -> Icons.Outlined.PriorityHigh
-            EventType.WATER -> Icons.Outlined.WaterDrop
-            EventType.CONFLICT -> Icons.Outlined.WarningAmber
-            EventType.SOS, EventType.MEDICAL -> Icons.Outlined.Sos
-            else -> null
+        val iconRes = when (event.eventType) {
+            EventType.FIRE -> R.drawable.local_fire_department_24dp
+            EventType.MEDICAL -> R.drawable.medical_services_24dp
+            EventType.SUPPLIES -> R.drawable.package_2_24dp
+            EventType.CONFLICT -> R.drawable.warning_24dp
+            EventType.CUSTOM -> R.drawable.location_on_24dp
         }
         
         val color = when (event.eventType) {
-            EventType.FIRE_HAZARD -> MeshColor.EmergencyRed
-            EventType.WATER -> MeshColor.MeshBlue
+            EventType.FIRE -> MeshColor.EmergencyRed
+            EventType.MEDICAL -> MeshColor.EmergencyRed
+            EventType.SUPPLIES -> MeshColor.MeshBlue
             EventType.CONFLICT -> MeshColor.AlertOrange
-            EventType.SOS, EventType.MEDICAL -> MeshColor.AssistYellow
-            else -> MeshColor.TextSecondary
+            EventType.CUSTOM -> MeshColor.AssistYellow
         }
 
-        if (showTitles && iconVector != null) {
+        if (showTitles) {
             // COMBINED VIEW: Icon + Label welded together
             val combinedId = "combined-${event.eventId}"
             if (style.getImage(combinedId) == null) {
-                createCombinedPinBitmap(context, iconVector, color, event.title.uppercase())?.let {
+                createCombinedPinFromDrawable(context, iconRes, color, event.title.uppercase())?.let {
                     style.addImage(combinedId, it)
                 }
             }
@@ -508,11 +522,11 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
         } else {
             // ICON ONLY VIEW
             val iconImage = when (event.eventType) {
-                EventType.FIRE_HAZARD -> "pin-fire"
-                EventType.WATER -> "pin-water"
+                EventType.FIRE -> "pin-fire"
+                EventType.MEDICAL -> "pin-medical"
+                EventType.SUPPLIES -> "pin-supplies"
                 EventType.CONFLICT -> "pin-conflict"
-                EventType.SOS, EventType.MEDICAL -> "pin-sos"
-                else -> "default-pin"
+                EventType.CUSTOM -> "pin-custom"
             }
 
             manager?.create(
@@ -525,9 +539,9 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
     }
 }
 
-private fun createCombinedPinBitmap(
+private fun createCombinedPinFromDrawable(
     context: android.content.Context,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    drawableId: Int,
     backgroundColor: Color,
     text: String
 ): Bitmap? {
@@ -572,22 +586,16 @@ private fun createCombinedPinBitmap(
     paint.color = android.graphics.Color.WHITE
     canvas.drawCircle(circleX, circleY, (circleSize / 2f) - 3f, paint)
     
-    // Draw Icon inside Circle
-    val iconSize = circleSize * 0.55f
-    val iconLeft = circleX - (iconSize / 2f)
-    val iconTop = circleY - (iconSize / 2f)
-    val scale = iconSize / icon.defaultWidth.value
-
-    canvas.save()
-    canvas.translate(iconLeft, iconTop)
-    canvas.scale(scale, scale)
-    val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-        style = android.graphics.Paint.Style.FILL
+    // Draw Icon from drawable
+    val drawable = ContextCompat.getDrawable(context, drawableId)
+    drawable?.let {
+        it.setTint(android.graphics.Color.WHITE)
+        val iconSize = (circleSize * 0.55f).toInt()
+        val iconLeft = (circleX - (iconSize / 2f)).toInt()
+        val iconTop = (circleY - (iconSize / 2f)).toInt()
+        it.setBounds(iconLeft, iconTop, iconLeft + iconSize, iconTop + iconSize)
+        it.draw(canvas)
     }
-    
-    drawVectorPaths(icon.root, canvas, iconPaint)
-    canvas.restore()
     
     // Draw Pill below Circle
     val pillX = (totalW - pillW) / 2f
@@ -622,9 +630,9 @@ private fun drawableToBitmap(context: android.content.Context, drawableId: Int):
     return bitmap
 }
 
-private fun createTacticalPinBitmap(
+private fun createTacticalPinFromDrawable(
     context: android.content.Context,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    drawableId: Int,
     backgroundColor: Color
 ): Bitmap? {
     val sizePx = 120
@@ -643,24 +651,14 @@ private fun createTacticalPinBitmap(
     paint.color = android.graphics.Color.WHITE
     canvas.drawCircle(sizePx / 2f, sizePx / 2f, (sizePx / 2f) - 3f, paint)
 
-    // 3. Render ImageVector Paths
-    val iconSize = sizePx * 0.55f
-    val iconLeft = (sizePx - iconSize) / 2f
-    val iconTop = (sizePx - iconSize) / 2f
-    val scale = iconSize / icon.defaultWidth.value
+    // 3. Render Drawable
+    val drawable = ContextCompat.getDrawable(context, drawableId) ?: return bitmap
+    drawable.setTint(android.graphics.Color.WHITE)
+    val iconSize = (sizePx * 0.55f).toInt()
+    val margin = (sizePx - iconSize) / 2
+    drawable.setBounds(margin, margin, margin + iconSize, margin + iconSize)
+    drawable.draw(canvas)
 
-    canvas.save()
-    canvas.translate(iconLeft, iconTop)
-    canvas.scale(scale, scale)
-
-    val iconPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-        style = android.graphics.Paint.Style.FILL
-    }
-
-    drawVectorPaths(icon.root, canvas, iconPaint)
-    canvas.restore()
-    
     return bitmap
 }
 

@@ -309,11 +309,11 @@ fun EventLogItem(
 @Composable
 fun EventTypeBadge(type: EventType) {
     val (color, label) = when (type) {
-        EventType.WATER -> Color(0xFF29B6F6) to "WATER"
-        EventType.CONFLICT -> Color(0xFFEF5350) to "CONFLICT"
-        EventType.MEDICAL -> Color(0xFFEC407A) to "MEDICAL"
-        EventType.SOS -> Color(0xFFAB47BC) to "SOS"
-        EventType.FIRE_HAZARD -> Color(0xFFFFA726) to "FIRE"
+        EventType.FIRE -> MeshColor.EmergencyRed to "FIRE"
+        EventType.MEDICAL -> MeshColor.EmergencyRed to "MEDICAL"
+        EventType.SUPPLIES -> MeshColor.MeshBlue to "SUPPLIES"
+        EventType.CONFLICT -> MeshColor.AlertOrange to "CONFLICT"
+        EventType.CUSTOM -> MeshColor.AssistYellow to "OTHER"
     }
 
     Surface(
