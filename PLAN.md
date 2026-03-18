@@ -1,24 +1,29 @@
-# PLAN: Map Crosshair Overlay (Task 2.4)
+# PLAN: Launch Refinement & Data Persistence (Task 2.13)
 
-Add a tactical crosshair to the center of the map to improve coordinate precision for the user.
+Transition the app from a mock-heavy development state to a persistent, user-location-focused utility.
 
-## 1. UI Implementation
+## 1. Data Logic Cleanup
+- **`MapViewModel.kt`**:
+    - Remove `eventRepository.populateMockData()` from the `init` block to prevent automatic data generation on every map launch.
+- **`EventLogViewModel.kt`**:
+    - Remove `eventRepository.populateMockData()` from the `init` block.
+    - Ensure `loadEvents()` (or equivalent reactive flow) is properly initiated to show existing data from the database.
+
+## 2. Map Launch Experience
 - **`MapScreen.kt`**:
-    - Update `MapCrosshair` to `Modifier.fillMaxSize()`.
-    - Enhance `Canvas` drawing:
-        - **Center Circle**: Draw a small outlined circle (e.g., 12dp diameter) at the exact center.
-        - **Full-Screen Lines**: Extend the horizontal and vertical lines from the edges of the center circle (with a small gap) all the way to the screen borders (`0` to `size.width/height`).
-        - **Refined Styling**: 
-            - Use `MeshColor.Primary` (Operational Gold) for the central elements (circle and inner line segments).
-            - Use a slightly more transparent or neutral color (e.g., `MeshColor.Border` or `MeshColor.TextSecondary`) for the screen-wide extensions to reduce visual clutter.
-            - Maintain the subtle drop shadow for visibility.
+    - Implement a "First-Time Zoom" logic:
+        - Add a state variable `var hasInitialZoomed by remember { mutableStateOf(false) }`.
+        - Inside a `LaunchedEffect(mapLibreMap)` or within the location update listener:
+            - If `!hasInitialZoomed` and `locationComponent.lastKnownLocation` is available:
+                - Animate the camera to the user's current coordinates.
+                - Set `hasInitialZoomed = true`.
 
-## 2. Refinements
-- Ensure the crosshair is placed *above* the map but *below* other UI overlays like the coordinate pill and tool stack to maintain a clean z-index hierarchy.
-- Add a subtle shadow or glow to ensure visibility against diverse map backgrounds (satellite, light, dark).
+## 3. Event Log Data Flow
+- **`EventLogViewModel.kt`**:
+    - Refactor `uiState` to be a pure reactive `StateFlow` combining filters and the repository's event flow. This ensures it always reflects the current database state without manual triggers.
 
-## 3. Verification Plan
+## 4. Verification Plan
 - **Manual Verification**:
-    - Build and run the app.
-    - Verify that the crosshair remains perfectly centered while panning and zooming the map.
-    - Confirm that the crosshair is clearly visible but non-obstructive.
+    - **Data Persistence**: Open the app, create a report, close the app totally, and reopen. Verify the report still exists and no *new* random events are created.
+    - **Auto-Zoom**: Clear app data or move location in emulator, then launch app. Verify the map automatically centers on the current "blue dot" location.
+    - **Event Log**: Confirm that manual reports appear in the log screen immediately.

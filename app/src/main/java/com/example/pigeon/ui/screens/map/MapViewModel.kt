@@ -57,10 +57,7 @@ class MapViewModel @Inject constructor(
     )
 
     init {
-        viewModelScope.launch {
-            // Populate mock data if database is empty or for demo purposes
-            eventRepository.populateMockData()
-        }
+        // Mock data population disabled for persistent operation
     }
 
     fun onMapMoved(latitude: Double, longitude: Double, zoom: Double) {

@@ -65,6 +65,7 @@ fun MapScreen(
     val symbolManagerState = remember { mutableStateOf<SymbolManager?>(null) }
     var selectedEvent by remember { mutableStateOf<Event?>(null) }
     var showReportingWizard by remember { mutableStateOf(false) }
+    var hasInitialZoomed by remember { mutableStateOf(false) }
     
     // Threshold for showing titles
     val zoomThreshold = 14.0
@@ -151,6 +152,26 @@ fun MapScreen(
         symbolManagerState.value?.let { manager ->
             mapLibreMap?.getStyle { style ->
                 updateSymbols(context, manager, style, uiState.events, showTitles)
+            }
+        }
+    }
+
+    // Auto-zoom to user location on launch
+    LaunchedEffect(mapLibreMap) {
+        if (mapLibreMap != null && !hasInitialZoomed) {
+            // Wait for location to become available
+            while (!hasInitialZoomed) {
+                val lastLocation = mapLibreMap?.locationComponent?.lastKnownLocation
+                if (lastLocation != null) {
+                    mapLibreMap?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(lastLocation.latitude, lastLocation.longitude),
+                            14.0
+                        )
+                    )
+                    hasInitialZoomed = true
+                }
+                kotlinx.coroutines.delay(1000)
             }
         }
     }
