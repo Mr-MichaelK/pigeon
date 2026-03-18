@@ -1,46 +1,24 @@
-# PLAN: Multi-Step Reporting Wizard (Task 2.3)
+# PLAN: Map Crosshair Overlay (Task 2.4)
 
-Implement a robust, tactical reporting flow with type selection, detailed inputs, and TTL management.
+Add a tactical crosshair to the center of the map to improve coordinate precision for the user.
 
-## 1. Model Refactoring
-- **`Event.kt`**:
-    - Update `EventType` enum: `FIRE`, `MEDICAL`, `SUPPLIES`, `CONFLICT`, `CUSTOM`.
+## 1. UI Implementation
 - **`MapScreen.kt`**:
-    - Refactor `updateSymbols` to map new `EventType` values to their specific vector assets:
-        - `FIRE` -> `local_fire_department_24dp`
-        - `MEDICAL` -> `medical_services_24dp`
-        - `SUPPLIES` -> `package_2_24dp`
-        - `CONFLICT` -> `warning_24dp`
-        - `CUSTOM` -> `location_on_24dp`
-    - Update `createTacticalPinBitmap` to load these drawables correctly.
+    - Update `MapCrosshair` to `Modifier.fillMaxSize()`.
+    - Enhance `Canvas` drawing:
+        - **Center Circle**: Draw a small outlined circle (e.g., 12dp diameter) at the exact center.
+        - **Full-Screen Lines**: Extend the horizontal and vertical lines from the edges of the center circle (with a small gap) all the way to the screen borders (`0` to `size.width/height`).
+        - **Refined Styling**: 
+            - Use `MeshColor.Primary` (Operational Gold) for the central elements (circle and inner line segments).
+            - Use a slightly more transparent or neutral color (e.g., `MeshColor.Border` or `MeshColor.TextSecondary`) for the screen-wide extensions to reduce visual clutter.
+            - Maintain the subtle drop shadow for visibility.
 
-## 2. Reporting Wizard UI (Stage 1: Selection)
-- **New Component: `ReportingWizardSheet.kt`**:
-    - Implement a `ModalBottomSheet` (or a custom overlay) with two stages.
-    - **Stage 1 (Grid)**:
-        - 2x2 grid (or similar) showing the 5 event types with icons and tactical styling.
-        - Selection state management.
-        - "Cancel" and "Next" buttons (Next enabled only when selected).
-    - **Location Info**: Pulse icon with "Auto-filled" metadata (Lat/Long).
+## 2. Refinements
+- Ensure the crosshair is placed *above* the map but *below* other UI overlays like the coordinate pill and tool stack to maintain a clean z-index hierarchy.
+- Add a subtle shadow or glow to ensure visibility against diverse map backgrounds (satellite, light, dark).
 
-## 3. Reporting Wizard UI (Stage 2: Details)
-- **Stage 2 (Inputs)**:
-    - Non-editable display of selected type icon/name.
-    - `OutlinedTextField` for "Event Title" and "Details".
-    - `TTL Selection`: Toggle or chip group for `1h`, `6h`, `24h`.
-    - "Cancel" and "Confirm Report" buttons.
-
-## 4. Logic & Storage
-- **`MapViewModel.kt`**:
-    - Add `reportEvent(type, title, description, ttlMillis)` function.
-    - Trigger `EventRepository.createEvent(...)`.
-- **`MockDataGenerator.kt`**:
-    - Update to use new `EventType` values to prevent runtime crashes.
-
-## 5. Verification Plan
-- **Unit Tests**:
-    - Test `EventRepository` to ensure new event types are correctly persisted and retrieved.
-    - Test `MapViewModel` logic for field validation (e.g., description required?).
-- **Manual QA**:
-    - Visual check of the wizard stages against tactical design specs.
-    - Verify reported events appear immediately on the map with correct icons.
+## 3. Verification Plan
+- **Manual Verification**:
+    - Build and run the app.
+    - Verify that the crosshair remains perfectly centered while panning and zooming the map.
+    - Confirm that the crosshair is clearly visible but non-obstructive.

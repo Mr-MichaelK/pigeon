@@ -14,4 +14,5 @@ object MeshColor {
     val MeshBlue = Color(0xFF5B8BDF) // Calm Blue
     val AlertOrange = Color(0xFFD97706) // Calm Orange
     val AssistYellow = Color(0xFFD9A536) // Calm Yellow
+    val Crosshair = Color(0xFFD65D5D)
 }

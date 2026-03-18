@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -20,7 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -176,10 +179,16 @@ fun MapScreen(
         MeshHeader()
 
         Box(modifier = Modifier.weight(1f)) {
-            // MapLibre View Container
             AndroidView(
                 factory = { mapView },
                 modifier = Modifier.fillMaxSize()
+            )
+
+            // Map Crosshair Overlay
+            MapCrosshair(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .align(Alignment.Center)
             )
 
             // Top Overlays
@@ -788,6 +797,93 @@ private fun drawVectorPaths(
         }
     }
     canvas.restore()
+}
+
+@Composable
+fun MapCrosshair(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = 1.5.dp.toPx()
+        val center = Offset(size.width / 2, size.height / 2)
+        val circleRadius = 8.dp.toPx()
+        val gap = 4.dp.toPx()
+        
+        // Colors
+        val primaryColor = MeshColor.Crosshair
+        val extensionColor = MeshColor.TextSecondary.copy(alpha = 0.4f)
+        val shadowColor = Color.Black.copy(alpha = 0.2f)
+        val shadowOffset = 0.5.dp.toPx()
+
+        // 1. Center Circle
+        drawCircle(
+            color = shadowColor,
+            radius = circleRadius,
+            center = center.copy(x = center.x + shadowOffset, y = center.y + shadowOffset),
+            style = Stroke(width = strokeWidth)
+        )
+        drawCircle(
+            color = primaryColor,
+            radius = circleRadius,
+            center = center,
+            style = Stroke(width = strokeWidth)
+        )
+
+        // 2. Full-Screen Lines
+        // Horizontal (Left)
+        drawLine(
+            color = extensionColor,
+            start = Offset(0f, center.y),
+            end = Offset(center.x - circleRadius - gap, center.y),
+            strokeWidth = strokeWidth
+        )
+        // Horizontal (Right)
+        drawLine(
+            color = extensionColor,
+            start = Offset(center.x + circleRadius + gap, center.y),
+            end = Offset(size.width, center.y),
+            strokeWidth = strokeWidth
+        )
+        // Vertical (Top)
+        drawLine(
+            color = extensionColor,
+            start = Offset(center.x, 0f),
+            end = Offset(center.x, center.y - circleRadius - gap),
+            strokeWidth = strokeWidth
+        )
+        // Vertical (Bottom)
+        drawLine(
+            color = extensionColor,
+            start = Offset(center.x, center.y + circleRadius + gap),
+            end = Offset(center.x, size.height),
+            strokeWidth = strokeWidth
+        )
+
+        // 3. Inner Cross (Small solid segments near circle for focus)
+        val focusLength = 12.dp.toPx()
+        drawLine(
+            color = primaryColor,
+            start = Offset(center.x - circleRadius - gap - focusLength, center.y),
+            end = Offset(center.x - circleRadius - gap, center.y),
+            strokeWidth = strokeWidth * 1.5f
+        )
+        drawLine(
+            color = primaryColor,
+            start = Offset(center.x + circleRadius + gap, center.y),
+            end = Offset(center.x + circleRadius + gap + focusLength, center.y),
+            strokeWidth = strokeWidth * 1.5f
+        )
+        drawLine(
+            color = primaryColor,
+            start = Offset(center.x, center.y - circleRadius - gap - focusLength),
+            end = Offset(center.x, center.y - circleRadius - gap),
+            strokeWidth = strokeWidth * 1.5f
+        )
+        drawLine(
+            color = primaryColor,
+            start = Offset(center.x, center.y + circleRadius + gap),
+            end = Offset(center.x, center.y + circleRadius + gap + focusLength),
+            strokeWidth = strokeWidth * 1.5f
+        )
+    }
 }
 
 private fun Color.toArgb(): Int = (value shr 32).toInt()
