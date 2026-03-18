@@ -41,21 +41,21 @@ class MockDataGenerator @Inject constructor() {
 
     private fun generateTitle(type: EventType): String {
         return when (type) {
-            EventType.WATER -> "Water Supply Issue"
-            EventType.CONFLICT -> "Conflict Reported"
-            EventType.MEDICAL -> "Medical Assistance Needed"
-            EventType.SOS -> "SOS Signal Detected"
-            EventType.FIRE_HAZARD -> "Fire Hazard Warning"
+            EventType.FIRE -> "Fire Hazard Warning"
+            EventType.MEDICAL -> "Medical Assistance"
+            EventType.SUPPLIES -> "Package Supply Spotted"
+            EventType.CONFLICT -> "Conflict Alert"
+            EventType.CUSTOM -> "POI Recorded"
         }
     }
 
     private fun generateDescription(type: EventType): String {
         return when (type) {
-            EventType.WATER -> "Clean water source reported contaminated."
-            EventType.CONFLICT -> "Avoid sector 4 due to ongoing activity."
-            EventType.MEDICAL -> "Injured civilian requires immediate transport."
-            EventType.SOS -> "Weak signal detected from sector 7."
-            EventType.FIRE_HAZARD -> "Dry brush fire reported near checkpoint."
+            EventType.FIRE -> "Containment required in sector 3."
+            EventType.MEDICAL -> "Casualties reported near checkpoint."
+            EventType.SUPPLIES -> "Rations and water surplus spotted."
+            EventType.CONFLICT -> "Ongoing engagement in central sector."
+            EventType.CUSTOM -> "Manual observation logged."
         }
     }
 }

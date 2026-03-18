@@ -3,6 +3,7 @@ package com.example.pigeon.ui.screens.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pigeon.domain.model.Event
+import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.model.MapMetadata
 import com.example.pigeon.domain.repository.EventRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 data class MapUiState(
@@ -55,10 +57,7 @@ class MapViewModel @Inject constructor(
     )
 
     init {
-        viewModelScope.launch {
-            // Populate mock data if database is empty or for demo purposes
-            eventRepository.populateMockData()
-        }
+        // Mock data population disabled for persistent operation
     }
 
     fun onMapMoved(latitude: Double, longitude: Double, zoom: Double) {
@@ -67,5 +66,36 @@ class MapViewModel @Inject constructor(
             longitude = longitude,
             zoom = zoom
         )
+    }
+
+    fun reportEvent(
+        eventType: EventType,
+        title: String,
+        description: String,
+        ttlMillis: Long
+    ) {
+        viewModelScope.launch {
+            val location = _metadata.value
+            eventRepository.createEvent(
+                Event(
+                    eventId = UUID.randomUUID().toString(),
+                    creatorDeviceId = "LOCAL-NODE", // Placeholder for local identity
+                    eventType = eventType,
+                    title = title,
+                    description = description,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    timestamp = System.currentTimeMillis(),
+                    isResolved = false,
+                    ttl = ttlMillis
+                )
+            )
+        }
+    }
+
+    fun onResolveEvent(eventId: String) {
+        viewModelScope.launch {
+            eventRepository.resolveEvent(eventId)
+        }
     }
 }

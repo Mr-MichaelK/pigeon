@@ -19,7 +19,7 @@ data class EventLogUiState(
 )
 
 enum class EventFilter {
-    ALL, UNRESOLVED, NEARBY
+    ALL, UNRESOLVED
 }
 
 @HiltViewModel
@@ -28,33 +28,40 @@ class EventLogViewModel @Inject constructor(
     private val eventRepository: EventRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(EventLogUiState(isLoading = true))
-    val uiState: StateFlow<EventLogUiState> = _uiState.asStateFlow()
+    private val _selectedFilter = MutableStateFlow(EventFilter.ALL)
+    private val _searchQuery = MutableStateFlow("")
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<EventLogUiState> = combine(
+        _selectedFilter,
+        _searchQuery
+    ) { filter, query ->
+        filter to query
+    }.flatMapLatest { (filter, query) ->
+        getEventsUseCase(filter, query).map { events ->
+            EventLogUiState(
+                events = events,
+                isLoading = false,
+                selectedFilter = filter,
+                searchQuery = query
+            )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = EventLogUiState(isLoading = true)
+    )
 
     init {
-        // Populate mock data on first launch (logic can be refined)
-        viewModelScope.launch {
-            eventRepository.populateMockData()
-            loadEvents()
-        }
-    }
-
-    private fun loadEvents() {
-        viewModelScope.launch {
-            _uiState.flatMapLatest { state ->
-                getEventsUseCase(state.selectedFilter, state.searchQuery)
-            }.collect { filteredEvents ->
-                _uiState.update { it.copy(events = filteredEvents, isLoading = false) }
-            }
-        }
+        // Initial state is reactive via uiState definition
     }
 
     fun onFilterSelected(filter: EventFilter) {
-        _uiState.update { it.copy(selectedFilter = filter) }
+        _selectedFilter.value = filter
     }
 
     fun onSearchQueryChanged(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
+        _searchQuery.value = query
     }
     
     fun onResolveEvent(eventId: String) {
