@@ -29,4 +29,7 @@ interface EventDao {
 
     @Query("DELETE FROM events")
     suspend fun deleteAllEvents()
+
+    @Query("DELETE FROM events WHERE timestamp < :expirationTime")
+    suspend fun deleteExpiredEvents(expirationTime: Long): Int
 }

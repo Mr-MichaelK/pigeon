@@ -115,6 +115,11 @@ dependencies {
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
     implementation("com.google.protobuf:protobuf-kotlin-lite:3.25.1")
     implementation("com.google.protobuf:protobuf-javalite:3.25.1")
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.work.compiler)
 }
 
 protobuf {

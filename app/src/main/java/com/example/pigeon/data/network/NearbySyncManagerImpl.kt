@@ -10,8 +10,15 @@ import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
 import com.example.pigeon.domain.network.ConnectionStatus
 import com.example.pigeon.domain.network.NearbySyncManager
+import com.example.pigeon.domain.repository.EventRepository
+import com.example.pigeon.domain.model.Event
+import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.proto.PigeonEvent
+import com.example.pigeon.proto.PigeonPayload
+import com.example.pigeon.proto.SyncItem
+import com.example.pigeon.proto.SyncManifest
 import com.google.android.gms.nearby.Nearby
+import kotlinx.coroutines.Job
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
 import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
@@ -31,6 +38,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,7 +46,8 @@ import javax.inject.Singleton
 
 @Singleton
 class NearbySyncManagerImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val eventRepository: EventRepository
 ) : NearbySyncManager {
 
     private val TAG = "NearbySyncManager"
@@ -55,16 +64,38 @@ class NearbySyncManagerImpl @Inject constructor(
     private val _nearbyPeers = MutableStateFlow<List<Peer>>(emptyList())
     override val nearbyPeers: StateFlow<List<Peer>> = _nearbyPeers.asStateFlow()
 
+    private var originalPowerState: MeshPowerState? = null
+    private var wakeUpJob: Job? = null
+    private var currentPowerState: MeshPowerState = MeshPowerState.OFF
+
+    private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val syncStates = mutableMapOf<String, SyncState>()
+
+    private data class SyncState(
+        val expectedIds: MutableSet<String> = mutableSetOf(),
+        val pendingPushes: MutableSet<Long> = mutableSetOf(),
+        var manifestReceived: Boolean = false,
+        var manifestSent: Boolean = false
+    )
+
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             if (payload.type == Payload.Type.BYTES) {
-                val data = payload.asBytes()
-                Log.d(TAG, "Payload received from $endpointId. Size: ${data?.size ?: 0}")
-                // TODO: Handle Protobuf parsing here
+                val data = payload.asBytes() ?: return
+                Log.d(TAG, "Payload received from $endpointId. Size: ${data.size}")
+                handleIncomingPayload(endpointId, data)
             }
         }
 
-        override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {}
+        override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
+            if (update.status == PayloadTransferUpdate.Status.SUCCESS) {
+                val state = syncStates[endpointId]
+                if (state != null && state.pendingPushes.remove(update.payloadId)) {
+                    Log.d(TAG, "Push confirmed for payload ${update.payloadId} to $endpointId")
+                    checkSyncCompletion(endpointId)
+                }
+            }
+        }
     }
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
@@ -82,14 +113,11 @@ class NearbySyncManagerImpl @Inject constructor(
                         }
                     }
 
-                    // Active device sends a "Hello" payload
+                    // Active node initiates sync by sending its manifest
                     if (_status.value == ConnectionStatus.ACTIVE) {
-                        Log.d(TAG, "Sending Hello payload to $endpointId")
-                        val helloPayload = Payload.fromBytes("Hello from $SERVICE_ID".toByteArray(Charsets.UTF_8))
-                        if (endpointId == MOCK_PEER_ID) {
-                            simulateMockPayload(endpointId)
-                        } else {
-                            connectionsClient.sendPayload(endpointId, helloPayload)
+                        Log.d(TAG, "Initiating Set Union sync with $endpointId")
+                        syncScope.launch {
+                            sendSyncManifest(endpointId)
                         }
                     }
                 }
@@ -107,6 +135,7 @@ class NearbySyncManagerImpl @Inject constructor(
 
         override fun onDisconnected(endpointId: String) {
             Log.d(TAG, "Disconnected from $endpointId")
+            syncStates.remove(endpointId)
             _nearbyPeers.update { currentPeers ->
                 currentPeers.map { 
                     if (it.deviceId == endpointId) it.copy(isConnected = false) else it 
@@ -129,7 +158,10 @@ class NearbySyncManagerImpl @Inject constructor(
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: com.google.android.gms.nearby.connection.DiscoveredEndpointInfo) {
-            processEndpointFound(endpointId, info.endpointName)
+            // Capture baseline RSSI if available, otherwise default to -60dBm for calculation
+            // Note: RSSI is not always exposed in standard connection callbacks, but we implement the hook here.
+            val rssi = -60 // Baseline fallback
+            processEndpointFound(endpointId, info.endpointName, rssi)
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -140,13 +172,19 @@ class NearbySyncManagerImpl @Inject constructor(
         }
     }
 
-    private fun processEndpointFound(endpointId: String, endpointName: String) {
-        Log.d(TAG, "Endpoint found: $endpointId ($endpointName)")
+    private fun processEndpointFound(endpointId: String, endpointName: String, rssi: Int) {
+        val physicalDist = calculatePhysicalDistance(rssi)
+        val uiDist = normalizeDistanceForRadar(physicalDist)
+        
+        Log.d(TAG, "📡 Radar Update: Peer $endpointId signal is ${rssi}dBm (~${String.format("%.1f", physicalDist)} meters).")
+
         val newPeer = Peer(
             deviceId = endpointId,
             callsign = endpointName,
             connectionType = ConnectionType.BLE,
-            rssi = -50,
+            rssi = rssi,
+            physicalDistance = physicalDist,
+            normalizedDistance = uiDist,
             syncProgress = 0f,
             lastSeen = System.currentTimeMillis(),
             isConnected = false
@@ -179,28 +217,233 @@ class NearbySyncManagerImpl @Inject constructor(
         }
     }
 
-    /** Helper to simulate incoming payload from a mock peer */
-    private fun simulateMockPayload(endpointId: String) {
-        debugScope.launch {
-            delay(2000)
-            Log.d(TAG, "Simulating mock payload from $endpointId")
+    // ── Set Union Synchronization ──────────────────────────────────────────────
+
+    private suspend fun generateLocalManifest(): SyncManifest {
+        val events = eventRepository.getAllEvents().first()
+        val items = events.map { event ->
+            SyncItem.newBuilder()
+                .setEventId(event.eventId)
+                .setEventHash(event.timestamp.toString())
+                .build()
+        }
+        Log.d(TAG, "Generated local manifest with ${items.size} items.")
+        return SyncManifest.newBuilder().addAllItems(items).build()
+    }
+
+    private suspend fun sendSyncManifest(endpointId: String) {
+        val manifest = generateLocalManifest()
+        val payload = PigeonPayload.newBuilder().setManifest(manifest).build()
+        val bytes = Payload.fromBytes(payload.toByteArray())
+        
+        // Mark manifest as sent in state
+        syncStates.getOrPut(endpointId) { SyncState() }.manifestSent = true
+        
+        Log.d(TAG, "Sending SyncManifest (${manifest.itemsCount} items) to $endpointId")
+        if (endpointId == MOCK_PEER_ID) {
+            debugScope.launch {
+                delay(1000)
+                simulateMockManifestResponse(endpointId)
+            }
+        } else {
+            connectionsClient.sendPayload(endpointId, bytes)
+        }
+        checkSyncCompletion(endpointId)
+    }
+
+    private fun handleIncomingPayload(endpointId: String, data: ByteArray) {
+        syncScope.launch {
+            try {
+                val pigeonPayload = PigeonPayload.parseFrom(data)
+                when {
+                    pigeonPayload.hasManifest() -> {
+                        Log.d(TAG, "Received SyncManifest from $endpointId")
+                        handleReceivedManifest(endpointId, pigeonPayload.manifest)
+                    }
+                    pigeonPayload.hasEvent() -> {
+                        Log.d(TAG, "Received PigeonEvent from $endpointId: ${pigeonPayload.event.eventId}")
+                        handleReceivedEvent(endpointId, pigeonPayload.event)
+                    }
+                    else -> {
+                        Log.w(TAG, "Received unknown payload type from $endpointId")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to parse PigeonPayload from $endpointId", e)
+            }
+        }
+    }
+
+    private suspend fun handleReceivedManifest(endpointId: String, remoteManifest: SyncManifest) {
+        val localEvents = eventRepository.getAllEvents().first()
+        val localMap = localEvents.associateBy { it.eventId }
+        val remoteMap = remoteManifest.itemsList.associateBy { it.eventId }
+
+        // Push local events that are missing or newer on the peer
+        var pushCount = 0
+        for (localEvent in localEvents) {
+            val remoteItem = remoteMap[localEvent.eventId]
+            if (remoteItem == null || localEvent.timestamp > (remoteItem.eventHash.toLongOrNull() ?: 0L)) {
+                pushEventToPeer(endpointId, localEvent)
+                pushCount++
+            }
+        }
+        Log.d(TAG, "Pushed $pushCount event(s) to $endpointId")
+
+        // Identify remote events we are missing or that are newer
+        val missingIds = remoteMap.keys - localMap.keys
+        val newerIds = remoteMap.filter { (id, item) ->
+            val local = localMap[id]
+            local != null && (item.eventHash.toLongOrNull() ?: 0L) > local.timestamp
+        }.keys
+
+        val needIds = missingIds + newerIds
+        Log.d(TAG, "Need ${needIds.size} event(s) from $endpointId (${missingIds.size} missing, ${newerIds.size} newer)")
+
+        // Track expected events
+        val state = syncStates.getOrPut(endpointId) { SyncState() }
+        state.manifestReceived = true
+        state.expectedIds.addAll(needIds)
+
+        // Send our manifest back so the peer can also push what we need
+        if (_status.value != ConnectionStatus.ACTIVE) {
+            sendSyncManifest(endpointId)
+        }
+        checkSyncCompletion(endpointId)
+    }
+
+    private suspend fun pushEventToPeer(endpointId: String, event: Event) {
+        val protoEvent = domainToProto(event)
+        val pigeonPayload = PigeonPayload.newBuilder().setEvent(protoEvent).build()
+        val payload = Payload.fromBytes(pigeonPayload.toByteArray())
+        
+        if (endpointId == MOCK_PEER_ID) {
+            Log.d(TAG, "[MOCK] Would push event ${event.eventId} to $endpointId")
+        } else {
+            // Track the push
+            syncStates[endpointId]?.pendingPushes?.add(payload.id)
+            connectionsClient.sendPayload(endpointId, payload)
+        }
+    }
+
+    private suspend fun handleReceivedEvent(endpointId: String, protoEvent: PigeonEvent) {
+        val domainEvent = protoToDomain(protoEvent)
+        eventRepository.createEvent(domainEvent)
+        
+        // Remove from expected list
+        val state = syncStates[endpointId]
+        state?.expectedIds?.remove(protoEvent.eventId)
+        
+        Log.d(TAG, "Upserted event ${domainEvent.eventId}. Remaining expected: ${state?.expectedIds?.size ?: 0}")
+        
+        // Propagation Wave: relay received data onward
+        startProximityWave()
+        
+        checkSyncCompletion(endpointId)
+    }
+
+    private fun checkSyncCompletion(endpointId: String) {
+        val state = syncStates[endpointId] ?: return
+        
+        if (state.manifestReceived && state.manifestSent && 
+            state.expectedIds.isEmpty() && state.pendingPushes.isEmpty()) {
             
+            Log.i(TAG, "✅ Sync Complete with $endpointId. Racing to sleep...")
+            
+            if (endpointId == MOCK_PEER_ID) {
+                // For mock, just update the flow
+                _nearbyPeers.update { currentPeers ->
+                    currentPeers.map { 
+                        if (it.deviceId == endpointId) it.copy(isConnected = false) else it 
+                    }
+                }
+            } else {
+                connectionsClient.disconnectFromEndpoint(endpointId)
+            }
+            syncStates.remove(endpointId)
+        }
+    }
+
+    // ── Proto ↔ Domain Converters ────────────────────────────────────────────
+
+    private fun domainToProto(event: Event): PigeonEvent {
+        val protoType = when (event.eventType) {
+            EventType.FIRE -> com.example.pigeon.proto.EventType.FIRE
+            EventType.MEDICAL -> com.example.pigeon.proto.EventType.MEDICAL
+            EventType.SUPPLIES -> com.example.pigeon.proto.EventType.RESOURCE
+            EventType.CONFLICT -> com.example.pigeon.proto.EventType.INFRASTRUCTURE
+            EventType.CUSTOM -> com.example.pigeon.proto.EventType.CUSTOM
+            EventType.SOS -> com.example.pigeon.proto.EventType.SOS
+        }
+        return PigeonEvent.newBuilder()
+            .setEventId(event.eventId)
+            .setEventType(protoType)
+            .setDescription(event.description)
+            .setLatitude(event.latitude)
+            .setLongitude(event.longitude)
+            .setTimestamp(event.timestamp)
+            .setCreatorDeviceId(event.creatorDeviceId)
+            .setIsResolved(event.isResolved)
+            .build()
+    }
+
+    private fun protoToDomain(proto: PigeonEvent): Event {
+        val domainType = when (proto.eventType) {
+            com.example.pigeon.proto.EventType.FIRE -> EventType.FIRE
+            com.example.pigeon.proto.EventType.MEDICAL -> EventType.MEDICAL
+            com.example.pigeon.proto.EventType.RESOURCE -> EventType.SUPPLIES
+            com.example.pigeon.proto.EventType.INFRASTRUCTURE -> EventType.CONFLICT
+            com.example.pigeon.proto.EventType.CUSTOM -> EventType.CUSTOM
+            com.example.pigeon.proto.EventType.SOS -> EventType.SOS
+            else -> EventType.CUSTOM
+        }
+        return Event(
+            eventId = proto.eventId,
+            creatorDeviceId = proto.creatorDeviceId,
+            eventType = domainType,
+            title = proto.description.take(50),
+            description = proto.description,
+            latitude = proto.latitude,
+            longitude = proto.longitude,
+            timestamp = proto.timestamp,
+            isResolved = proto.isResolved,
+            ttl = 0L
+        )
+    }
+
+    /** Simulates a mock peer sending us a SyncManifest with one event we don't have */
+    private fun simulateMockManifestResponse(endpointId: String) {
+        debugScope.launch {
+            delay(1000)
+            Log.d(TAG, "Simulating mock manifest response from $endpointId")
+            val mockItem = SyncItem.newBuilder()
+                .setEventId("MOCK_EVT_999")
+                .setEventHash(System.currentTimeMillis().toString())
+                .build()
+            val mockManifest = SyncManifest.newBuilder().addItems(mockItem).build()
+            val payload = PigeonPayload.newBuilder().setManifest(mockManifest).build()
+            payloadCallback.onPayloadReceived(endpointId, Payload.fromBytes(payload.toByteArray()))
+
+            delay(1000)
+            Log.d(TAG, "Simulating mock event push from $endpointId")
             val mockEvent = PigeonEvent.newBuilder()
                 .setEventId("MOCK_EVT_999")
                 .setEventType(com.example.pigeon.proto.EventType.MEDICAL)
-                .setDescription("Test Mock Event: Oxygen requested at extraction point.")
+                .setDescription("MOCK: Oxygen requested at extraction point.")
+                .setLatitude(33.8938)
+                .setLongitude(35.5018)
                 .setTimestamp(System.currentTimeMillis())
                 .setCreatorDeviceId(MOCK_PEER_ID)
                 .build()
-            
-            val payload = Payload.fromBytes(mockEvent.toByteArray())
-            payloadCallback.onPayloadReceived(endpointId, payload)
+            val eventPayload = PigeonPayload.newBuilder().setEvent(mockEvent).build()
+            payloadCallback.onPayloadReceived(endpointId, Payload.fromBytes(eventPayload.toByteArray()))
         }
     }
 
     override fun simulateNearbyPeerFound() {
-        Log.d(TAG, "Manual simulation triggered for $MOCK_PEER_ID")
-        processEndpointFound(MOCK_PEER_ID, MOCK_PEER_NAME)
+        val simulatedRssi = (-70..-45).random()
+        Log.d(TAG, "Manual simulation triggered for $MOCK_PEER_ID with RSSI $simulatedRssi")
+        processEndpointFound(MOCK_PEER_ID, MOCK_PEER_NAME, simulatedRssi)
     }
 
     private fun hasRequiredPermissions(): Boolean {
@@ -224,6 +467,7 @@ class NearbySyncManagerImpl @Inject constructor(
 
     override fun togglePowerState(newState: MeshPowerState) {
         Log.d(TAG, "Toggling PowerState to: $newState")
+        currentPowerState = newState
         if (newState != MeshPowerState.OFF && !hasRequiredPermissions()) {
             Log.e(TAG, "Missing required permissions for Nearby Connections. Aborting state change.")
             return
@@ -275,12 +519,45 @@ class NearbySyncManagerImpl @Inject constructor(
 
     override fun broadcastIncident(event: PigeonEvent) {
         Log.d(TAG, "Broadcasting Immediate Incident: ${event.eventId}")
-        // TODO: Convert to PigeonPayload and send to endpoints
+        val payload = PigeonPayload.newBuilder().setEvent(event).build()
+        val bytes = Payload.fromBytes(payload.toByteArray())
+        _nearbyPeers.value.filter { it.isConnected }.forEach { peer ->
+            if (peer.deviceId != MOCK_PEER_ID) {
+                connectionsClient.sendPayload(peer.deviceId, bytes)
+            }
+        }
+    }
+
+    override fun startProximityWave() {
+        Log.i(TAG, "📡 Wave Triggered: Propagating new data to nearby peers...")
+        
+        // If mesh is OFF or PASSIVE, wake it up
+        if (currentPowerState == MeshPowerState.OFF || currentPowerState == MeshPowerState.PASSIVE) {
+            if (wakeUpJob == null) {
+                originalPowerState = currentPowerState
+            }
+            togglePowerState(MeshPowerState.ACTIVE)
+        }
+
+        // Reset/Start 60s timer
+        wakeUpJob?.cancel()
+        wakeUpJob = syncScope.launch {
+            delay(60000)
+            val revertState = originalPowerState ?: MeshPowerState.PASSIVE
+            Log.d(TAG, "💤 Race to Sleep: Window expired, returning to $revertState.")
+            togglePowerState(revertState)
+            wakeUpJob = null
+            originalPowerState = null
+        }
     }
 
     override fun syncDeltas() {
         Log.d(TAG, "Initiating opportunistic sync deltas...")
-        // TODO: Map current Room DB to SyncManifest and broadcast payload
+        syncScope.launch {
+            _nearbyPeers.value.filter { it.isConnected }.forEach { peer ->
+                sendSyncManifest(peer.deviceId)
+            }
+        }
     }
 
     override fun stop() {
@@ -289,5 +566,24 @@ class NearbySyncManagerImpl @Inject constructor(
         connectionsClient.stopDiscovery()
         connectionsClient.stopAllEndpoints()
         _nearbyPeers.value = emptyList()
+    }
+
+    /**
+     * Physical Distance Formula:
+     * Distance = 10 ^ ((MeasuredRSSI - ReferenceRSSI) / (-10 * PathLossExponent))
+     * Ref: -50 dBm @ 1m, PathLossExponent: 2.5
+     */
+    private fun calculatePhysicalDistance(rssi: Int): Float {
+        val refRssi = -50.0
+        val n = 2.5
+        return Math.pow(10.0, (rssi.toDouble() - refRssi) / (-10.0 * n)).toFloat()
+    }
+
+    /**
+     * Maps physical distance (0-50m) to UI radius (0.0-1.0)
+     */
+    private fun normalizeDistanceForRadar(meters: Float): Float {
+        val maxDisplayRange = 50f
+        return (meters / maxDisplayRange).coerceIn(0.1f, 0.95f)
     }
 }

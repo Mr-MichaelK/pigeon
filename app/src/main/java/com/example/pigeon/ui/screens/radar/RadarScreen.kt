@@ -250,9 +250,8 @@ fun RadarCanvas(
             
             // Draw Peers
             activePeers.forEach { peer ->
-                // Map RSSI (-90 to -40) to distance (1.0 to 0.0)
-                // Stronger signal (closer to -40) = closer to center
-                val normalizedDist = ((peer.rssi + 40).coerceAtMost(0) / -50f).coerceIn(0.1f, 0.9f)
+                // Using pre-calculated physical/normalized distance from Data Layer
+                val normalizedDist = peer.normalizedDistance
                 
                 // Random angle for visualization (in real app, would need bearing)
                 // Using hash of ID to keep position stable

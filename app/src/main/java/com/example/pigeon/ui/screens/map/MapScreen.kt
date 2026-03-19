@@ -163,7 +163,11 @@ fun MapScreen(
         if (mapLibreMap != null && !hasInitialZoomed) {
             // Wait for location to become available
             while (!hasInitialZoomed) {
-                val lastLocation = mapLibreMap?.locationComponent?.lastKnownLocation
+                val lastLocation = try {
+                    mapLibreMap?.locationComponent?.lastKnownLocation
+                } catch (e: Exception) {
+                    null // LocationComponent not yet activated
+                }
                 if (lastLocation != null) {
                     mapLibreMap?.animateCamera(
                         CameraUpdateFactory.newLatLngZoom(

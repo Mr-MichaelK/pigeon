@@ -11,6 +11,7 @@ interface NearbySyncManager {
 
     fun togglePowerState(newState: MeshPowerState)
     fun broadcastIncident(event: PigeonEvent)
+    fun startProximityWave()
     fun syncDeltas()
     fun stop()
     

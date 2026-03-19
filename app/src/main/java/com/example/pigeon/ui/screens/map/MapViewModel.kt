@@ -6,6 +6,7 @@ import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.model.MapMetadata
 import com.example.pigeon.domain.repository.EventRepository
+import com.example.pigeon.domain.network.NearbySyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,7 +32,8 @@ data class MapUiState(
 
 @HiltViewModel
 class MapViewModel @Inject constructor(
-    private val eventRepository: EventRepository
+    private val eventRepository: EventRepository,
+    private val nearbySyncManager: NearbySyncManager
 ) : ViewModel() {
 
     private val _metadata = MutableStateFlow(
@@ -90,6 +92,7 @@ class MapViewModel @Inject constructor(
                     ttl = ttlMillis
                 )
             )
+            nearbySyncManager.startProximityWave()
         }
     }
 
