@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+option java_package = "com.example.pigeon.proto";
+option java_multiple_files = true;
+option optimize_for = LITE_RUNTIME;
+
+enum EventType {
+  UNKNOWN_TYPE = 0; // Protobuf requires the first enum to be 0
+  FIRE = 1;
+  MEDICAL = 2;
+  INFRASTRUCTURE = 3;
+  RESOURCE = 4;
+  CUSTOM = 5;
+  SOS = 6;
+}
+
+message PigeonEvent {
+  string eventId = 1;
+  EventType eventType = 2;
+  string description = 3;
+  double latitude = 4;
+  double longitude = 5;
+  int64 timestamp = 6;
+  string creatorDeviceId = 7;
+  bool isResolved = 8;
+}
+
+message SyncItem {
+  string eventId = 1;
+  string eventHash = 2;
+}
+
+message SyncManifest {
+  repeated SyncItem items = 1;
+}
+
+message PigeonPayload {
+  oneof payload {
+    PigeonEvent event = 1;
+    SyncManifest manifest = 2;
+  }
+}
