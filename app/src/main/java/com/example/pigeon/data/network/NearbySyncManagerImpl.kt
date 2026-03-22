@@ -67,6 +67,7 @@ class NearbySyncManagerImpl @Inject constructor(
     private var originalPowerState: MeshPowerState? = null
     private var wakeUpJob: Job? = null
     private var currentPowerState: MeshPowerState = MeshPowerState.OFF
+    private var isStickyActive: Boolean = false
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncStates = mutableMapOf<String, SyncState>()
@@ -465,8 +466,18 @@ class NearbySyncManagerImpl @Inject constructor(
         }
     }
 
-    override fun togglePowerState(newState: MeshPowerState) {
-        Log.d(TAG, "Toggling PowerState to: $newState")
+    override fun togglePowerState(newState: MeshPowerState, isSticky: Boolean) {
+        if (newState == MeshPowerState.ACTIVE && isSticky) {
+            Log.d(TAG, "⚡ Power State: Upgrading to STICKY ACTIVE (User/Report initiated).")
+            isStickyActive = true
+            wakeUpJob?.cancel()
+            wakeUpJob = null
+            originalPowerState = null
+        } else if (newState != MeshPowerState.ACTIVE) {
+            isStickyActive = false
+        }
+
+        Log.d(TAG, "Toggling PowerState to: $newState (Sticky: $isStickyActive)")
         currentPowerState = newState
         if (newState != MeshPowerState.OFF && !hasRequiredPermissions()) {
             Log.e(TAG, "Missing required permissions for Nearby Connections. Aborting state change.")
@@ -529,14 +540,19 @@ class NearbySyncManagerImpl @Inject constructor(
     }
 
     override fun startProximityWave() {
-        Log.i(TAG, "📡 Wave Triggered: Propagating new data to nearby peers...")
+        Log.d(TAG, "🌊 Power State: Switching to TEMPORARY ACTIVE (Relay wave).")
+
+        if (isStickyActive && currentPowerState == MeshPowerState.ACTIVE) {
+            Log.d(TAG, "Wave active but already STICKY. No timer required.")
+            return
+        }
         
         // If mesh is OFF or PASSIVE, wake it up
         if (currentPowerState == MeshPowerState.OFF || currentPowerState == MeshPowerState.PASSIVE) {
             if (wakeUpJob == null) {
                 originalPowerState = currentPowerState
             }
-            togglePowerState(MeshPowerState.ACTIVE)
+            togglePowerState(MeshPowerState.ACTIVE, isSticky = false)
         }
 
         // Reset/Start 60s timer
@@ -545,7 +561,7 @@ class NearbySyncManagerImpl @Inject constructor(
             delay(60000)
             val revertState = originalPowerState ?: MeshPowerState.PASSIVE
             Log.d(TAG, "💤 Race to Sleep: Window expired, returning to $revertState.")
-            togglePowerState(revertState)
+            togglePowerState(revertState, isSticky = false)
             wakeUpJob = null
             originalPowerState = null
         }

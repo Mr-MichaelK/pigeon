@@ -70,32 +70,6 @@ class MapViewModel @Inject constructor(
         )
     }
 
-    fun reportEvent(
-        eventType: EventType,
-        title: String,
-        description: String,
-        ttlMillis: Long
-    ) {
-        viewModelScope.launch {
-            val location = _metadata.value
-            eventRepository.createEvent(
-                Event(
-                    eventId = UUID.randomUUID().toString(),
-                    creatorDeviceId = "LOCAL-NODE", // Placeholder for local identity
-                    eventType = eventType,
-                    title = title,
-                    description = description,
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    timestamp = System.currentTimeMillis(),
-                    isResolved = false,
-                    ttl = ttlMillis
-                )
-            )
-            nearbySyncManager.startProximityWave()
-        }
-    }
-
     fun onResolveEvent(eventId: String) {
         viewModelScope.launch {
             eventRepository.resolveEvent(eventId)

@@ -58,7 +58,8 @@ import org.maplibre.android.style.layers.Property
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    viewModel: MapViewModel = hiltViewModel()
+    viewModel: MapViewModel = hiltViewModel(),
+    reportViewModel: ReportViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -301,7 +302,14 @@ fun MapScreen(
                 ReportingWizardSheet(
                     onDismiss = { showReportingWizard = false },
                     onReport = { type, title, desc, ttlHours ->
-                        viewModel.reportEvent(type, title, desc, ttlHours * 60 * 60 * 1000)
+                        reportViewModel.reportEvent(
+                            eventType = type,
+                            title = title,
+                            description = desc,
+                            ttlMillis = ttlHours * 60 * 60 * 1000,
+                            latitude = uiState.metadata.latitude,
+                            longitude = uiState.metadata.longitude
+                        )
                     },
                     currentLatitude = uiState.metadata.latitude,
                     currentLongitude = uiState.metadata.longitude

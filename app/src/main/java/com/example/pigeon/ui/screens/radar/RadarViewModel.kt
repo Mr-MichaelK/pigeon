@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.pigeon.domain.model.ConnectionType
 import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
+import com.example.pigeon.domain.network.ConnectionStatus
 import com.example.pigeon.domain.network.NearbySyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,14 +40,22 @@ class RadarViewModel @Inject constructor(
         
         viewModelScope.launch {
             nearbySyncManager.status.collectLatest { status ->
-                _uiState.update { it.copy(isScanning = status != com.example.pigeon.domain.network.ConnectionStatus.OFF) }
+                val mappedState = when (status) {
+                    is ConnectionStatus.ACTIVE -> MeshPowerState.ACTIVE
+                    is ConnectionStatus.PASSIVE -> MeshPowerState.PASSIVE
+                    else -> MeshPowerState.OFF
+                }
+                _uiState.update { it.copy(
+                    powerState = mappedState,
+                    isScanning = status != ConnectionStatus.OFF
+                ) }
             }
         }
     }
 
     fun setPowerState(state: MeshPowerState) {
-        _uiState.update { it.copy(powerState = state) }
-        nearbySyncManager.togglePowerState(state)
+        // We only call the manager; the UI will sync via the status Flow collected in init {}
+        nearbySyncManager.togglePowerState(state, isSticky = true)
     }
 
     fun triggerDebugDiscovery() {

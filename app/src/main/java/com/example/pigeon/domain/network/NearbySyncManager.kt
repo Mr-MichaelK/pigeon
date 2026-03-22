@@ -9,7 +9,7 @@ interface NearbySyncManager {
     val status: StateFlow<ConnectionStatus>
     val nearbyPeers: StateFlow<List<Peer>>
 
-    fun togglePowerState(newState: MeshPowerState)
+    fun togglePowerState(newState: MeshPowerState, isSticky: Boolean = false)
     fun broadcastIncident(event: PigeonEvent)
     fun startProximityWave()
     fun syncDeltas()
