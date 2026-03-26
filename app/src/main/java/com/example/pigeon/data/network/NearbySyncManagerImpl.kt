@@ -50,7 +50,7 @@ class NearbySyncManagerImpl @Inject constructor(
     private val eventRepository: EventRepository
 ) : NearbySyncManager {
 
-    private val TAG = "NearbySyncManager"
+    private val TAG = "[MESH_RADIO]"
     private val SERVICE_ID = context.packageName
     private val MOCK_PEER_ID = "MOCK_PEER_001"
     private val MOCK_PEER_NAME = "Mock Responder"
@@ -66,8 +66,10 @@ class NearbySyncManagerImpl @Inject constructor(
 
     private var originalPowerState: MeshPowerState? = null
     private var wakeUpJob: Job? = null
+    private var radioJob: Job? = null
     private var currentPowerState: MeshPowerState = MeshPowerState.OFF
     private var isStickyActive: Boolean = false
+    private var lastTransitionTime = 0L
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncStates = mutableMapOf<String, SyncState>()
@@ -477,14 +479,34 @@ class NearbySyncManagerImpl @Inject constructor(
             isStickyActive = false
         }
 
-        Log.d(TAG, "Toggling PowerState to: $newState (Sticky: $isStickyActive)")
+        radioJob?.cancel()
+        radioJob = syncScope.launch {
+            val now = System.currentTimeMillis()
+            val elapsed = now - lastTransitionTime
+            if (elapsed < 2000 && newState != currentPowerState) {
+                val waitTime = 2000 - elapsed
+                Log.d(TAG, "Debouncing radio transition to $newState (waiting ${waitTime}ms)")
+                delay(waitTime)
+            }
+
+            executePowerStateChange(newState)
+            lastTransitionTime = System.currentTimeMillis()
+        }
+    }
+
+    private fun executePowerStateChange(newState: MeshPowerState) {
+        Log.d(TAG, "Executing PowerState change: $newState (Sticky: $isStickyActive)")
         currentPowerState = newState
+        
         if (newState != MeshPowerState.OFF && !hasRequiredPermissions()) {
             Log.e(TAG, "Missing required permissions for Nearby Connections. Aborting state change.")
             return
         }
 
-        stop() // Ensure clean state before transitioning
+        // Only call stop if we are transitioning FROM an active state
+        if (_status.value != ConnectionStatus.OFF) {
+            stop() 
+        }
 
         when (newState) {
             MeshPowerState.ACTIVE -> {
@@ -498,7 +520,7 @@ class NearbySyncManagerImpl @Inject constructor(
                 startAdvertising()
             }
             MeshPowerState.OFF -> {
-                Log.d(TAG, "Power OFF. Stop completed.")
+                Log.d(TAG, "Power OFF. Quiet mode engaged.")
                 _status.value = ConnectionStatus.OFF
             }
         }
@@ -512,6 +534,9 @@ class NearbySyncManagerImpl @Inject constructor(
             Log.d(TAG, "Advertising started successfully.")
         }.addOnFailureListener { e ->
             Log.e(TAG, "Failed to start advertising.", e)
+            if (e is com.google.android.gms.common.api.ApiException) {
+                handleRadioError(e.statusCode, MeshPowerState.PASSIVE)
+            }
             _status.value = ConnectionStatus.OFF
         }
     }
@@ -524,7 +549,23 @@ class NearbySyncManagerImpl @Inject constructor(
             Log.d(TAG, "Discovery started successfully.")
         }.addOnFailureListener { e ->
             Log.e(TAG, "Failed to start discovery.", e)
+            if (e is com.google.android.gms.common.api.ApiException) {
+                handleRadioError(e.statusCode, MeshPowerState.ACTIVE)
+            }
             _status.value = ConnectionStatus.OFF
+        }
+    }
+
+    private fun handleRadioError(errorCode: Int, retryState: MeshPowerState) {
+        if (errorCode == ConnectionsStatusCodes.STATUS_RADIO_ERROR) {
+            Log.e(TAG, "Critical Radio Error (8007) detected. Scheduling soft reset in 5s.")
+            syncScope.launch {
+                delay(5000)
+                Log.i(TAG, "Attempting Radio Soft Reset...")
+                stop()
+                delay(1000)
+                executePowerStateChange(retryState)
+            }
         }
     }
 
@@ -577,10 +618,14 @@ class NearbySyncManagerImpl @Inject constructor(
     }
 
     override fun stop() {
-        Log.d(TAG, "Stopping NearbySyncManager to clear radio resources.")
-        connectionsClient.stopAdvertising()
-        connectionsClient.stopDiscovery()
-        connectionsClient.stopAllEndpoints()
+        Log.d(TAG, "Stopping NearbySyncManager radio active tasks.")
+        try {
+            connectionsClient.stopAdvertising()
+            connectionsClient.stopDiscovery()
+            connectionsClient.stopAllEndpoints()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error during stop(): ${e.message}")
+        }
         _nearbyPeers.value = emptyList()
     }
 

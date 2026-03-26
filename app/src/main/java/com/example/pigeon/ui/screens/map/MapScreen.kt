@@ -1,6 +1,7 @@
 package com.example.pigeon.ui.screens.map
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Bundle
@@ -54,6 +55,10 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.style.layers.Property
+import android.content.Context
+import java.io.File
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +70,33 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
+    
+    // Connectivity State
+    var isDeviceConnected by remember { mutableStateOf(isOnline(context)) }
+    val offlineAssetAvailable = remember { assetExists(context, "lebanon_base.mbtiles") }
+
+    // Observe Connection Changes
+    DisposableEffect(context) {
+        val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                isDeviceConnected = true
+            }
+            override fun onLost(network: android.net.Network) {
+                isDeviceConnected = false
+            }
+        }
+        val request = android.net.`NetworkRequest`.Builder()
+            .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        cm.registerNetworkCallback(request, callback)
+        onDispose {
+            cm.unregisterNetworkCallback(callback)
+        }
+    }
+
     val symbolManagerState = remember { mutableStateOf<SymbolManager?>(null) }
+    
     var selectedEvent by remember { mutableStateOf<Event?>(null) }
     var showReportingWizard by remember { mutableStateOf(false) }
     var hasInitialZoomed by remember { mutableStateOf(false) }
@@ -79,7 +110,7 @@ fun MapScreen(
     ) { permissions ->
         val granted = permissions.values.all { it }
         if (granted) {
-            mapLibreMap?.getStyle { style ->
+            mapLibreMap?.getStyle { style: Style ->
                 enableLocationComponent(mapLibreMap!!, style, context)
             }
         }
@@ -99,38 +130,44 @@ fun MapScreen(
         MapView(context).apply {
             getMapAsync { map ->
                 mapLibreMap = map
-                map.setStyle("https://demotiles.maplibre.org/style.json") { style ->
-                    // Register dynamic tactical pins
-                    val firePin = createTacticalPinFromDrawable(context, R.drawable.local_fire_department_24dp, MeshColor.EmergencyRed)
-                    val medicalPin = createTacticalPinFromDrawable(context, R.drawable.medical_services_24dp, MeshColor.EmergencyRed)
-                    val suppliesPin = createTacticalPinFromDrawable(context, R.drawable.package_2_24dp, MeshColor.MeshBlue)
-                    val conflictPin = createTacticalPinFromDrawable(context, R.drawable.warning_24dp, MeshColor.AlertOrange)
-                    val customPin = createTacticalPinFromDrawable(context, R.drawable.location_on_24dp, MeshColor.AssistYellow)
-                    val defaultPin = drawableToBitmap(context, R.drawable.ic_default_pin)
+                
+                val absolutePath = getOfflineMapPath(context)
+                val mbtilesUri = "mbtiles://$absolutePath"
+                
+                // Fixed shadow variable for styleUrl
+                val styleUrl = if (!isOnline(context) && offlineAssetAvailable) {
+                    "asset://style-offline.json"
+                } else {
+                    "https://demotiles.maplibre.org/style.json"
+                }
 
-                    style.addImage("pin-fire", firePin)
-                    style.addImage("pin-medical", medicalPin)
-                    style.addImage("pin-supplies", suppliesPin)
-                    style.addImage("pin-conflict", conflictPin)
-                    style.addImage("pin-custom", customPin)
-                    defaultPin?.let { style.addImage("default-pin", it) }
-
-                    val manager = SymbolManager(this@apply, map, style).apply {
-                        iconAllowOverlap = true
-                        textAllowOverlap = true
-                    }
-                    symbolManagerState.value = manager
-                    
-                    enableLocationComponent(map, style, context)
-                    updateSymbols(context, manager, style, uiState.events, currentZoom >= zoomThreshold)
-
-                    manager.addClickListener { symbol ->
-                        selectedEvent = uiState.events.find { 
-                            it.latitude == symbol.latLng.latitude && 
-                            it.longitude == symbol.latLng.longitude 
+                if (styleUrl == "asset://style-offline.json") {
+                    try {
+                        val styleJson = context.assets.open("style-offline.json").bufferedReader().use { it.readText() }
+                        val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
+                        Log.d("MAP_DEBUG", "🔄 Initializing with Dynamic Offline Style: $mbtilesUri")
+                        map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { style: Style ->
+                            setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
                         }
-                        true
+                    } catch (e: Exception) {
+                        Log.e("MAP_DEBUG", "❌ Initial Offline Load Failed: ${e.message}")
+                        map.setStyle(styleUrl) { style: Style ->
+                            setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                        }
                     }
+                } else {
+                    map.setStyle(styleUrl) { style: Style ->
+                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                    }
+                }
+                
+                // Style Error & Map Failure Listeners
+                this@apply.addOnDidFailLoadingMapListener { errorMessage ->
+                    Log.e("MAP_DEBUG", "❌ Map Loading Failed: $errorMessage")
+                }
+                
+                this@apply.addOnStyleImageMissingListener { imageName ->
+                    Log.w("MAP_DEBUG", "⚠️ Style Image Missing: $imageName")
                 }
                 
                 map.addOnCameraMoveListener {
@@ -149,11 +186,50 @@ fun MapScreen(
         }
     }
 
+    // Dynamic Style Switching when Online/Offline status changes
+    LaunchedEffect(isDeviceConnected) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        
+        val absolutePath = getOfflineMapPath(context)
+        val mbtilesUri = "mbtiles://$absolutePath"
+        
+        val targetStyle = if (!isDeviceConnected && offlineAssetAvailable) {
+            "asset://style-offline.json"
+        } else {
+            "https://demotiles.maplibre.org/style.json"
+        }
+        
+        map.getStyle { currentStyle: Style ->
+            if (currentStyle.url != targetStyle || !isDeviceConnected) {
+                if (targetStyle == "asset://style-offline.json") {
+                    try {
+                        val styleJson = context.assets.open("style-offline.json").bufferedReader().use { it.readText() }
+                        val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
+                        
+                        Log.d("MAP_DEBUG", "🔄 Switching to Dynamic Offline Style: $mbtilesUri")
+                        map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { newStyle: Style ->
+                            setupMapStyle(mapView, map, newStyle, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MAP_DEBUG", "❌ Offline Load Failed, using fallback: ${e.message}")
+                        map.setStyle(targetStyle) { newStyle: Style ->
+                             setupMapStyle(mapView, map, newStyle, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                        }
+                    }
+                } else {
+                    map.setStyle(targetStyle) { newStyle: Style ->
+                        setupMapStyle(mapView, map, newStyle, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                    }
+                }
+            }
+        }
+    }
+
     // React to event changes OR zoom threshold cross to update symbols
     val showTitles = currentZoom >= zoomThreshold
     LaunchedEffect(uiState.events, showTitles) {
         symbolManagerState.value?.let { manager ->
-            mapLibreMap?.getStyle { style ->
+            mapLibreMap?.getStyle { style: Style ->
                 updateSymbols(context, manager, style, uiState.events, showTitles)
             }
         }
@@ -455,7 +531,70 @@ fun ToolStack(
     }
 }
 
-// Legacy EventDetailSheet removed in favor of standalone component
+@SuppressLint("MissingPermission")
+private fun setupMapStyle(
+    mapView: MapView,
+    map: MapLibreMap,
+    style: Style,
+    context: android.content.Context,
+    events: List<Event>,
+    zoom: Double,
+    zoomThreshold: Double,
+    symbolManagerState: MutableState<SymbolManager?>,
+    onEventClick: (Event) -> Unit
+) {
+    // 1. Register icons (must be re-added on style change)
+    val firePin = createTacticalPinFromDrawable(context, R.drawable.local_fire_department_24dp, MeshColor.EmergencyRed)
+    val medicalPin = createTacticalPinFromDrawable(context, R.drawable.medical_services_24dp, MeshColor.EmergencyRed)
+    val suppliesPin = createTacticalPinFromDrawable(context, R.drawable.package_2_24dp, MeshColor.MeshBlue)
+    val conflictPin = createTacticalPinFromDrawable(context, R.drawable.warning_24dp, MeshColor.AlertOrange)
+    val customPin = createTacticalPinFromDrawable(context, R.drawable.location_on_24dp, MeshColor.AssistYellow)
+    val defaultPin = drawableToBitmap(context, R.drawable.ic_default_pin)
+
+    style.addImage("pin-fire", firePin)
+    style.addImage("pin-medical", medicalPin)
+    style.addImage("pin-supplies", suppliesPin)
+    style.addImage("pin-conflict", conflictPin)
+    style.addImage("pin-custom", customPin)
+    defaultPin?.let { style.addImage("default-pin", it) }
+
+    // 2. Clear old manager if exists
+    symbolManagerState.value?.let { oldManager ->
+        try { oldManager.onDestroy() } catch (e: Exception) {}
+    }
+    
+    // 3. Create new manager for the new style
+    val manager = SymbolManager(mapView, map, style).apply {
+        iconAllowOverlap = true
+        textAllowOverlap = true
+    }
+    symbolManagerState.value = manager
+    
+    // 4. Setup interaction
+    manager.addClickListener { symbol ->
+        val event = events.find { 
+            it.latitude == symbol.latLng.latitude && 
+            it.longitude == symbol.latLng.longitude 
+        }
+        if (event != null) {
+            onEventClick(event)
+            true
+        } else {
+            false
+        }
+    }
+
+    // 5. Initial content
+    enableLocationComponent(map, style, context)
+    updateSymbols(context, manager, style, events, zoom >= zoomThreshold)
+    
+    // MAP_DEBUG: Force camera to Lebanon if offline style is active
+    if (style.url?.contains("style-offline.json") == true) {
+        val lebanonCenter = LatLng(33.8938, 35.5018)
+        map.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngZoom(lebanonCenter, 10.0))
+        Log.d("MAP_DEBUG", "📍 Offline Style detected: Forcing Camera to Lebanon Center (33.8938, 35.5018)")
+    }
+}
 
 @SuppressLint("MissingPermission")
 private fun enableLocationComponent(map: MapLibreMap, style: Style, context: android.content.Context) {
@@ -652,137 +791,9 @@ private fun createTacticalPinFromDrawable(
     return bitmap
 }
 
-private fun createLabelPillBitmap(text: String): Bitmap? {
-    val paint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#171511".toColorInt() // Tactical Black
-        textSize = 32f // High-res source size
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
-        textAlign = android.graphics.Paint.Align.CENTER
-    }
-
-    val horizontalPadding = 32f
-    val verticalPadding = 20f
-    val cornerRadius = 24f
-
-    val textBounds = android.graphics.Rect()
-    paint.getTextBounds(text, 0, text.length, textBounds)
-
-    val width = textBounds.width() + (horizontalPadding * 2)
-    val height = textBounds.height() + (verticalPadding * 2)
-
-    val bitmap = Bitmap.createBitmap(width.toInt(), height.toInt(), Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(bitmap)
-    val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-        style = android.graphics.Paint.Style.FILL
-    }
-
-    val rect = android.graphics.RectF(0f, 0f, width, height)
-    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
-
-    // Add subtle tactical border
-    bgPaint.style = android.graphics.Paint.Style.STROKE
-    bgPaint.strokeWidth = 2f
-    bgPaint.color = "#E5E0D6".toColorInt()
-    canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
-
-    val textY = (height / 2f) - ((paint.descent() + paint.ascent()) / 2f)
-    canvas.drawText(text, width / 2f, textY, paint)
-
-    return bitmap
-}
-
-private fun drawVectorPaths(
-    group: androidx.compose.ui.graphics.vector.VectorGroup,
-    canvas: Canvas,
-    paint: android.graphics.Paint
-) {
-    canvas.save()
-    canvas.translate(group.translationX, group.translationY)
-    canvas.rotate(group.rotation, group.pivotX, group.pivotY)
-    canvas.scale(group.scaleX, group.scaleY, group.pivotX, group.pivotY)
-
-    group.forEach { node ->
-        when (node) {
-            is androidx.compose.ui.graphics.vector.VectorGroup -> {
-                drawVectorPaths(node, canvas, paint)
-            }
-            is androidx.compose.ui.graphics.vector.VectorPath -> {
-                val path = android.graphics.Path()
-                var lastX = 0f
-                var lastY = 0f
-                node.pathData.forEach { p ->
-                    when (p) {
-                        is androidx.compose.ui.graphics.vector.PathNode.MoveTo -> {
-                            path.moveTo(p.x, p.y)
-                            lastX = p.x
-                            lastY = p.y
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.RelativeMoveTo -> {
-                            path.rMoveTo(p.dx, p.dy)
-                            lastX += p.dx
-                            lastY += p.dy
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.LineTo -> {
-                            path.lineTo(p.x, p.y)
-                            lastX = p.x
-                            lastY = p.y
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.RelativeLineTo -> {
-                            path.rLineTo(p.dx, p.dy)
-                            lastX += p.dx
-                            lastY += p.dy
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.HorizontalTo -> {
-                            path.lineTo(p.x, lastY)
-                            lastX = p.x
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.RelativeHorizontalTo -> {
-                            path.rLineTo(p.dx, 0f)
-                            lastX += p.dx
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.VerticalTo -> {
-                            path.lineTo(lastX, p.y)
-                            lastY = p.y
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.RelativeVerticalTo -> {
-                            path.rLineTo(0f, p.dy)
-                            lastY += p.dy
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.CurveTo -> {
-                            path.cubicTo(p.x1, p.y1, p.x2, p.y2, p.x3, p.y3)
-                            lastX = p.x3
-                            lastY = p.y3
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.RelativeCurveTo -> {
-                            path.rCubicTo(p.dx1, p.dy1, p.dx2, p.dy2, p.dx3, p.dy3)
-                            lastX += p.dx3
-                            lastY += p.dy3
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.QuadTo -> {
-                            path.quadTo(p.x1, p.y1, p.x2, p.y2)
-                            lastX = p.x2
-                            lastY = p.y2
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.RelativeQuadTo -> {
-                            path.rQuadTo(p.dx1, p.dy1, p.dx2, p.dy2)
-                            lastX += p.dx2
-                            lastY += p.dy2
-                        }
-                        is androidx.compose.ui.graphics.vector.PathNode.Close -> path.close()
-                        else -> {}
-                    }
-                }
-                canvas.drawPath(path, paint)
-            }
-        }
-    }
-    canvas.restore()
-}
-
 @Composable
 fun MapCrosshair(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
         val strokeWidth = 1.5.dp.toPx()
         val center = Offset(size.width / 2, size.height / 2)
         val circleRadius = 8.dp.toPx()
@@ -868,3 +879,51 @@ fun MapCrosshair(modifier: Modifier = Modifier) {
 }
 
 private fun Color.toArgb(): Int = (value shr 32).toInt()
+
+/**
+ * Checks for internet connectivity via ConnectivityManager.
+ */
+private fun isOnline(context: android.content.Context): Boolean {
+    val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        val network = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    } else {
+        @Suppress("DEPRECATION")
+        return cm.activeNetworkInfo?.isConnected == true
+    }
+}
+
+/**
+ * Checks if a specific file exists in the app's assets.
+ */
+private fun assetExists(context: android.content.Context, filename: String): Boolean {
+    return try {
+        context.assets.list("")?.contains(filename) == true
+    } catch (e: Exception) {
+        false
+    }
+}
+
+/**
+ * Retrieves the absolute path to the offline map file, copying it from assets if needed.
+ */
+private fun getOfflineMapPath(context: Context): String {
+    val fileName = "lebanon_base.mbtiles"
+    val file = File(context.filesDir, fileName)
+    if (!file.exists()) {
+        try {
+            context.assets.open(fileName).use { inputStream ->
+                java.io.FileOutputStream(file).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            android.util.Log.d("MAP_DEBUG", "✅ Asset copied to: \${file.absolutePath}")
+        } catch (e: Exception) {
+            android.util.Log.e("MAP_DEBUG", "❌ Failed to copy asset: \${e.message}")
+        }
+    }
+    return file.absolutePath
+}
+
