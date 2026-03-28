@@ -59,6 +59,16 @@ import android.content.Context
 import java.io.File
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.layers.FillLayer
+
+import org.maplibre.android.style.layers.PropertyFactory.*
+import org.maplibre.android.location.engine.LocationEngineCallback
+import org.maplibre.android.location.engine.LocationEngineResult
+import org.maplibre.android.location.engine.LocationEngineRequest
+import kotlinx.coroutines.awaitCancellation
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,31 +81,10 @@ fun MapScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     
-    // Connectivity State
-    var isDeviceConnected by remember { mutableStateOf(isOnline(context)) }
-    val offlineAssetAvailable = remember { assetExists(context, "lebanon_base.mbtiles") }
-
-    // Observe Connection Changes
-    DisposableEffect(context) {
-        val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: android.net.Network) {
-                isDeviceConnected = true
-            }
-            override fun onLost(network: android.net.Network) {
-                isDeviceConnected = false
-            }
-        }
-        val request = android.net.`NetworkRequest`.Builder()
-            .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-        cm.registerNetworkCallback(request, callback)
-        onDispose {
-            cm.unregisterNetworkCallback(callback)
-        }
-    }
-
+    // Map State
     val symbolManagerState = remember { mutableStateOf<SymbolManager?>(null) }
+    var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    val verificationRadiusMeters = 500.0
     
     var selectedEvent by remember { mutableStateOf<Event?>(null) }
     var showReportingWizard by remember { mutableStateOf(false) }
@@ -134,29 +123,18 @@ fun MapScreen(
                 val absolutePath = getOfflineMapPath(context)
                 val mbtilesUri = "mbtiles://$absolutePath"
                 
-                // Fixed shadow variable for styleUrl
-                val styleUrl = if (!isOnline(context) && offlineAssetAvailable) {
-                    "asset://style-offline.json"
-                } else {
-                    "https://demotiles.maplibre.org/style.json"
-                }
-
-                if (styleUrl == "asset://style-offline.json") {
-                    try {
-                        val styleJson = context.assets.open("style-offline.json").bufferedReader().use { it.readText() }
-                        val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
-                        Log.d("MAP_DEBUG", "🔄 Initializing with Dynamic Offline Style: $mbtilesUri")
-                        map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { style: Style ->
-                            setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MAP_DEBUG", "❌ Initial Offline Load Failed: ${e.message}")
-                        map.setStyle(styleUrl) { style: Style ->
-                            setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
-                        }
+                // Permanent Offline Style
+                try {
+                    val styleJson = context.assets.open("style-offline.json").bufferedReader().use { it.readText() }
+                    val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
+                    Log.d("MAP_DEBUG", "🔄 Initializing with Permanent Offline Style: $mbtilesUri")
+                    map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { style: Style ->
+                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
                     }
-                } else {
-                    map.setStyle(styleUrl) { style: Style ->
+                } catch (e: Exception) {
+                    Log.e("MAP_DEBUG", "❌ Offline style loading failed: ${e.message}")
+                    // Fallback to direct asset (might fail if MBTiles uri isn't replaced, but best we can do)
+                    map.setStyle("asset://style-offline.json") { style: Style ->
                         setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
                     }
                 }
@@ -182,48 +160,63 @@ fun MapScreen(
                         )
                     }
                 }
+
+                // Initial location capture
+                try {
+                    map.locationComponent.lastKnownLocation?.let { 
+                        userLocation = LatLng(it.latitude, it.longitude)
+                    }
+                } catch (e: Exception) {}
             }
         }
     }
 
-    // Dynamic Style Switching when Online/Offline status changes
-    LaunchedEffect(isDeviceConnected) {
+    // Monitor User Location
+    LaunchedEffect(mapLibreMap) {
         val map = mapLibreMap ?: return@LaunchedEffect
+        val locationComponent = map.locationComponent
         
-        val absolutePath = getOfflineMapPath(context)
-        val mbtilesUri = "mbtiles://$absolutePath"
-        
-        val targetStyle = if (!isDeviceConnected && offlineAssetAvailable) {
-            "asset://style-offline.json"
-        } else {
-            "https://demotiles.maplibre.org/style.json"
+        // Wait for activation
+        while (!locationComponent.isLocationComponentActivated) {
+            delay(500)
         }
         
-        map.getStyle { currentStyle: Style ->
-            if (currentStyle.url != targetStyle || !isDeviceConnected) {
-                if (targetStyle == "asset://style-offline.json") {
-                    try {
-                        val styleJson = context.assets.open("style-offline.json").bufferedReader().use { it.readText() }
-                        val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
-                        
-                        Log.d("MAP_DEBUG", "🔄 Switching to Dynamic Offline Style: $mbtilesUri")
-                        map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { newStyle: Style ->
-                            setupMapStyle(mapView, map, newStyle, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MAP_DEBUG", "❌ Offline Load Failed, using fallback: ${e.message}")
-                        map.setStyle(targetStyle) { newStyle: Style ->
-                             setupMapStyle(mapView, map, newStyle, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
-                        }
-                    }
-                } else {
-                    map.setStyle(targetStyle) { newStyle: Style ->
-                        setupMapStyle(mapView, map, newStyle, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
-                    }
+        val engine = locationComponent.locationEngine ?: return@LaunchedEffect
+        
+        val listener = object : LocationEngineCallback<LocationEngineResult> {
+            override fun onSuccess(result: LocationEngineResult?) {
+                result?.lastLocation?.let { location ->
+                    userLocation = LatLng(location.latitude, location.longitude)
                 }
+            }
+            override fun onFailure(exception: Exception) {}
+        }
+        
+        val request = LocationEngineRequest.Builder(1000L).build()
+        engine.requestLocationUpdates(request, listener, android.os.Looper.getMainLooper())
+        
+        try {
+            awaitCancellation()
+        } finally {
+            engine.removeLocationUpdates(listener)
+        }
+    }
+
+    // Update Proximity Circle Visuals
+    LaunchedEffect(userLocation) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        val loc = userLocation ?: return@LaunchedEffect
+        
+        map.getStyle { style ->
+            val source = style.getSourceAs<GeoJsonSource>("proximity-source")
+            if (source != null) {
+                val geoJson = createRadiusPolygon(loc, verificationRadiusMeters, 64)
+                source.setGeoJson(geoJson)
             }
         }
     }
+
+    // Connection state removed - Map stays offline
 
     // React to event changes OR zoom threshold cross to update symbols
     val showTitles = currentZoom >= zoomThreshold
@@ -238,12 +231,20 @@ fun MapScreen(
     // Auto-zoom to user location on launch
     LaunchedEffect(mapLibreMap) {
         if (mapLibreMap != null && !hasInitialZoomed) {
-            // Wait for location to become available
+             // Initial setup: camera to Lebanon center if offline
+            val style = mapLibreMap?.style
+            if (style?.url?.contains("style-offline.json") == true || style?.json != null) {
+                val lebanonCenter = LatLng(33.8938, 35.5018)
+                mapLibreMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(lebanonCenter, 10.0))
+                Log.d("MAP_DEBUG", "📍 Initial Camera to Lebanon Center")
+            }
+
+            // Then follow location
             while (!hasInitialZoomed) {
                 val lastLocation = try {
                     mapLibreMap?.locationComponent?.lastKnownLocation
                 } catch (e: Exception) {
-                    null // LocationComponent not yet activated
+                    null
                 }
                 if (lastLocation != null) {
                     mapLibreMap?.animateCamera(
@@ -254,7 +255,7 @@ fun MapScreen(
                     )
                     hasInitialZoomed = true
                 }
-                kotlinx.coroutines.delay(1000)
+                delay(1000)
             }
         }
     }
@@ -369,6 +370,7 @@ fun MapScreen(
             selectedEvent?.let { event ->
                 EventDetailSheet(
                     event = event,
+                    userLocation = userLocation,
                     onDismiss = { selectedEvent = null },
                     onResolve = viewModel::onResolveEvent
                 )
@@ -584,7 +586,19 @@ private fun setupMapStyle(
         }
     }
 
-    // 5. Initial content
+    // 5. Proximity Visuals Layer (Added BEFORE symbols so it sits underneath)
+    if (style.getSource("proximity-source") == null) {
+        style.addSource(GeoJsonSource("proximity-source"))
+        val proximityLayer = FillLayer("proximity-layer", "proximity-source")
+            .withProperties(
+                fillColor("rgba(223, 156, 32, 0.15)"), // Operational Gold with 0.15 alpha
+                fillOutlineColor("rgba(223, 156, 32, 0.4)")
+            )
+        // Add at top for testing visibility
+        style.addLayer(proximityLayer)
+    }
+
+    // 6. Initial content
     enableLocationComponent(map, style, context)
     updateSymbols(context, manager, style, events, zoom >= zoomThreshold)
     
@@ -881,32 +895,6 @@ fun MapCrosshair(modifier: Modifier = Modifier) {
 private fun Color.toArgb(): Int = (value shr 32).toInt()
 
 /**
- * Checks for internet connectivity via ConnectivityManager.
- */
-private fun isOnline(context: android.content.Context): Boolean {
-    val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-        val network = cm.activeNetwork ?: return false
-        val capabilities = cm.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    } else {
-        @Suppress("DEPRECATION")
-        return cm.activeNetworkInfo?.isConnected == true
-    }
-}
-
-/**
- * Checks if a specific file exists in the app's assets.
- */
-private fun assetExists(context: android.content.Context, filename: String): Boolean {
-    return try {
-        context.assets.list("")?.contains(filename) == true
-    } catch (e: Exception) {
-        false
-    }
-}
-
-/**
  * Retrieves the absolute path to the offline map file, copying it from assets if needed.
  */
 private fun getOfflineMapPath(context: Context): String {
@@ -927,3 +915,32 @@ private fun getOfflineMapPath(context: Context): String {
     return file.absolutePath
 }
 
+/**
+ * Creates a GeoJSON Feature string representing a Polygon (a circle approximation with 64 points)
+ * around the given [center] with the specified [radiusInMeters].
+ */
+private fun createRadiusPolygon(center: LatLng, radiusInMeters: Double, points: Int = 64): String {
+    val distanceX = radiusInMeters / (111320.0 * kotlin.math.cos(center.latitude * Math.PI / 180.0))
+    val distanceY = radiusInMeters / 110574.0
+
+    val coordinates = StringBuilder()
+    coordinates.append("[")
+    for (i in 0 until points) {
+        val theta = (i.toDouble() / points) * (2 * Math.PI)
+        val x = distanceX * kotlin.math.cos(theta)
+        val y = distanceY * kotlin.math.sin(theta)
+        val lng = center.longitude + x
+        val lat = center.latitude + y
+        coordinates.append("[$lng, $lat]")
+        if (i < points - 1) {
+            coordinates.append(", ")
+        }
+    }
+    // Close the polygon
+    val firstX = distanceX * kotlin.math.cos(0.0)
+    val firstY = distanceY * kotlin.math.sin(0.0)
+    coordinates.append(", [${center.longitude + firstX}, ${center.latitude + firstY}]")
+    coordinates.append("]")
+
+    return "{ \"type\": \"Feature\", \"geometry\": { \"type\": \"Polygon\", \"coordinates\": [$coordinates] } }"
+}

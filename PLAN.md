@@ -1,20 +1,30 @@
-# PLAN: Safe Offline Style Reversion
+# PLAN.md: Proximity Validation Visuals
 
-## Goal
-Restore the offline map rendering by removing missing font dependencies (glyphs) that are causing the map loading pipeline to fail.
+## Objective
+Update the visual representation of the verification radius in `MapScreen.kt` to use a true geographic polygon rather than a pixel-based circle layer, ensuring perfect scaling at all zoom levels.
 
-## Proposed Changes
+## Files to Modify
+1. `app/src/main/java/com/example/pigeon/ui/screens/map/MapScreen.kt`
 
-### 1. Update `style-offline.json` [MODIFY]
-- **File**: `app/src/main/assets/style-offline.json`
-- **Action 1**: Completely remove the `"glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"` line from the root JSON object.
-- **Action 2**: Within the `place_labels` and `road_labels` layer configurations, remove the `"text-field"` and `"text-font"` properties from the `layout` objects. This prevents MapLibre from attempting to rasterize missing fonts while preserving the layer structure for future integration when local font PBFs are supplied.
+## Logic Patterns & Implementation Steps
 
-### 2. Verify `MapScreen.kt` Diagnostic Listeners [REVIEW]
-- **File**: `app/src/main/java/com/example/pigeon/ui/screens/map/MapScreen.kt`
-- **Action**: Ensure that `this@apply.addOnDidFailLoadingMapListener` and `map.addOnStyleImageMissingListener` are correctly configured to log (`Log.e` and `Log.w` respectively) any future rendering failures exactly to Logcat.
+### 1. Generating the Polygon (64 points)
+We will create a helper function `createRadiusPolygon(center: LatLng, radiusInMeters: Double, points: Int = 64): String`. 
+This function will:
+- Calculate 64 coordinate pairs forming a circle around the center point.
+- Construct and return a raw GeoJSON string representing a `Feature` with a `Polygon` geometry.
 
-## Verification Plan
-1. User approves the plan.
-2. Coder executes the JSON and Kotlin changes.
-3. User syncs and runs the project to verify the map shape rendering returns successfully in offline mode.
+### 2. Style Injection (addSource & addLayer)
+Inside the map style initialization block (`setupMapStyle` or initial setup):
+- Add a `GeoJsonSource` with ID `"proximity-source"`.
+- Add a `FillLayer` with ID `"proximity-layer"`, referencing `"proximity-source"`.
+- Set the layer properties to a soft blue: `fillColor("rgba(0, 122, 255, 0.27)")` (equivalent to `0x44007AFF`).
+- Place the layer below text labels and pins.
+
+### 3. Continuous Updates
+Use a `LaunchedEffect(userLocation)` to observe location changes.
+- When `userLocation` changes, call `createRadiusPolygon` with a 500.0m radius (or the configured radius).
+- Retrieve the `"proximity-source"` from the map style and update its GeoJSON data with the newly generated polygon string.
+
+## Next Step
+Wait for the user to say "Plan approved" or "Proceed" before moving to the Coder phase.

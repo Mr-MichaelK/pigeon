@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,9 +30,21 @@ import java.util.*
 @Composable
 fun EventDetailSheet(
     event: Event,
+    userLocation: org.maplibre.android.geometry.LatLng?,
     onDismiss: () -> Unit,
     onResolve: (String) -> Unit
 ) {
+    val verificationRadius = 500.0 // meters
+    
+    val distance = remember(event, userLocation) {
+        if (userLocation == null) null
+        else calculateDistance(
+            userLocation.latitude, userLocation.longitude,
+            event.latitude, event.longitude
+        )
+    }
+    
+    val isWithinRadius = distance != null && distance <= verificationRadius
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -150,16 +163,44 @@ fun EventDetailSheet(
 
             // Action: Resolve Button
             if (!event.isResolved) {
-                Button(
-                    onClick = { 
-                        onResolve(event.eventId)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MeshColor.SuccessGreen)
-                ) {
-                    Text("RESOLVE INCIDENT", fontWeight = FontWeight.Bold, color = Color.White)
+                if (!isWithinRadius) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.05f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LockClock,
+                                contentDescription = null,
+                                tint = MeshColor.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "TOO FAR TO VERIFY (${String.format("%.0f", distance ?: 0.0)}m)",
+                                fontWeight = FontWeight.Bold,
+                                color = MeshColor.TextSecondary,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = { 
+                            onResolve(event.eventId)
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MeshColor.SuccessGreen)
+                    ) {
+                        Text("RESOLVE INCIDENT", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             } else {
                 OutlinedButton(
@@ -253,4 +294,20 @@ private fun MetadataPill(
             }
         }
     }
+}
+
+/**
+ * Calculates the distance between two points in meters using the Haversine formula.
+ */
+private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371e3 // Earth radius in meters
+    val phi1 = lat1 * Math.PI / 180
+    val phi2 = lat2 * Math.PI / 180
+    val deltaPhi = (lat2 - lat1) * Math.PI / 180
+    val deltaLambda = (lon2 - lon1) * Math.PI / 180
+    val a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return r * c
 }
