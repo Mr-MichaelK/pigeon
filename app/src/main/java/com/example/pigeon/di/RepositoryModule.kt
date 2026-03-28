@@ -1,5 +1,7 @@
 package com.example.pigeon.di
 
+import com.example.pigeon.data.repository.LocationRepositoryImpl
+import com.example.pigeon.domain.repository.LocationRepository
 import com.example.pigeon.data.repository.local.LocalUserRepository
 import com.example.pigeon.domain.repository.UserRepository
 import com.example.pigeon.data.repository.EventRepositoryImpl
@@ -28,4 +30,10 @@ abstract class RepositoryModule {
     abstract fun bindEventRepository(
         eventRepositoryImpl: EventRepositoryImpl
     ): EventRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindLocationRepository(
+        locationRepositoryImpl: LocationRepositoryImpl
+    ): LocationRepository
 }

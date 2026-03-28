@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,8 @@ import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.usecase.EventFilter
 import com.example.pigeon.ui.theme.MeshColor
+import com.example.pigeon.ui.util.LocationUtils
+import org.maplibre.android.geometry.LatLng
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -82,6 +85,7 @@ fun EventLogScreen(
                 items(uiState.events) { event ->
                     EventLogItem(
                         event = event,
+                        userLocation = uiState.userLocation,
                         onResolve = { viewModel.onResolveEvent(event.eventId) }
                     )
                 }
@@ -181,8 +185,19 @@ fun EventLogFilterRow(
 @Composable
 fun EventLogItem(
     event: Event,
+    userLocation: LatLng?,
     onResolve: () -> Unit
 ) {
+    val distance = remember(event, userLocation) {
+        if (userLocation != null) {
+            LocationUtils.calculateDistance(
+                userLocation.latitude, userLocation.longitude,
+                event.latitude, event.longitude
+            )
+        } else null
+    }
+    
+    val isWithinRadius = distance != null && distance <= 500.0
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -270,17 +285,32 @@ fun EventLogItem(
                         )
                         
                         if (!event.isResolved) {
-                            TextButton(
-                                onClick = onResolve,
-                                contentPadding = PaddingValues(0.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text(
-                                    text = "MARK RESOLVED",
-                                    color = MeshColor.Primary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                distance?.let { d ->
+                                    Text(
+                                        text = if (d >= 1000) String.format("%.1fkm", d/1000) else String.format("%.0fm", d),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isWithinRadius) MeshColor.Primary.copy(alpha = 0.7f) else MeshColor.EmergencyRed.copy(alpha = 0.7f),
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                }
+                                
+                                TextButton(
+                                    onClick = onResolve,
+                                    enabled = isWithinRadius,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.height(32.dp),
+                                    colors = ButtonDefaults.textButtonColors(
+                                        disabledContentColor = MeshColor.TextSecondary.copy(alpha = 0.5f)
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (isWithinRadius) "MARK RESOLVED" else "TOO FAR",
+                                        color = if (isWithinRadius) MeshColor.Primary else MeshColor.TextPrimary.copy(alpha = 0.38f),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -6,14 +6,12 @@ import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.model.MapMetadata
 import com.example.pigeon.domain.repository.EventRepository
+import com.example.pigeon.domain.repository.LocationRepository
 import com.example.pigeon.domain.network.NearbySyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import org.maplibre.android.geometry.LatLng
+import com.example.pigeon.ui.util.LocationUtils
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -27,12 +25,16 @@ data class MapUiState(
         lastSyncMinutes = 5
     ),
     val events: List<Event> = emptyList(),
+    val selectedEvent: Event? = null,
+    val isWithinRadius: Boolean = false,
+    val distanceMeters: Double? = null,
     val isLoading: Boolean = false
 )
 
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val eventRepository: EventRepository,
+    private val locationRepository: LocationRepository,
     private val nearbySyncManager: NearbySyncManager
 ) : ViewModel() {
 
@@ -44,13 +46,26 @@ class MapViewModel @Inject constructor(
         )
     )
 
+    private val _selectedEvent = MutableStateFlow<Event?>(null)
+
     val uiState: StateFlow<MapUiState> = combine(
         _metadata,
-        eventRepository.getAllEvents()
-    ) { metadata, events ->
+        eventRepository.getAllEvents(),
+        locationRepository.userLocation,
+        _selectedEvent
+    ) { metadata, events, userLoc, selectedEvent ->
+        val distance = if (userLoc != null && selectedEvent != null) {
+            LocationUtils.calculateDistance(userLoc.latitude, userLoc.longitude, selectedEvent.latitude, selectedEvent.longitude)
+        } else null
+        
+        val isQualified = distance != null && distance <= 500.0
+        
         MapUiState(
             metadata = metadata,
-            events = events
+            events = events,
+            selectedEvent = selectedEvent,
+            isWithinRadius = isQualified,
+            distanceMeters = distance
         )
     }.stateIn(
         scope = viewModelScope,
@@ -73,6 +88,15 @@ class MapViewModel @Inject constructor(
     fun onResolveEvent(eventId: String) {
         viewModelScope.launch {
             eventRepository.resolveEvent(eventId)
+            _selectedEvent.value = null // Dismiss sheet on resolve
         }
+    }
+
+    fun updateLocation(location: LatLng) {
+        locationRepository.updateLocation(location)
+    }
+
+    fun onEventSelected(event: Event?) {
+        _selectedEvent.value = event
     }
 }

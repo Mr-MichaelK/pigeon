@@ -100,3 +100,34 @@
 - [x] **Coder:** Implement RSSI-based distance math to populate the Radar UI with real-time peer proximity.
 
 - [x] **Reviewer:** Perform Field/Mesh Testing with at least three physical devices to simulate opportunistic "Store-and-Forward" propagation.
+
+## 🟢 PHASE 5: Proximity-Based Sidecar Verification (COMPLETED)
+### Task 5.1: Spatial Trust Logic (Haversine Implementation)
+- [x] **Architect:** Define the `calculateDistance` utility interface for spherical geometry.
+- [x] **Coder:** Implement the Haversine formula in Kotlin to return distance in meters.
+- [x] **Reviewer:** Unit test logic against GPS benchmarks to ensure verification precision.
+
+### Task 5.2: Visual Trust Zone (Map Overlay)
+- [x] **Architect:** Define the GeoJSON coordinate math for a 64-point circular polygon.
+- [x] **Coder:** Implement the `proximity-source` and `proximity-layer` (FillLayer) in MapLibre.
+- [x] **Reviewer:** Audit UI to ensure the radius overlay doesn't obstruct map labels.
+
+### Task 5.3: Verification Gating & State Bridge
+- [x] **Architect:** Design the state-flow between MapScreen (Location) and EventDetailSheet.
+- [x] **Coder:** Implement `isWithinRadius` check and pass it to UI components.
+- [x] **Reviewer:** Verify real-time toggle of verification status as the user moves.
+
+### Task 5.4: Sidecar UI & Interaction Constraints
+- [x] **Architect:** Design the visual language for "Out of Bounds" interaction.
+- [x] **Coder:** Update the Event Detail Sidecar to disable the "RESOLVE" button and display a "Too Far to Verify" proximity warning.
+- [x] **Reviewer:** Ensure UX clarity—users must understand why they are barred from resolving specific incidents.
+
+### Task 5.5: Dynamic Anchor & Sync
+- [x] **Architect:** Plan the update frequency for the radius source (1Hz).
+- [x] **Coder:** Bind the radius polygon source to `LocationEngine` for smooth updates.
+- [x] **Reviewer:** Performance check for frame drops during map movement.
+ 
+ ### Task 5.6: Logs Screen Proximity Lock
+ - [x] **Architect:** Centralize location management in `LocationRepository` for cross-screen state sharing.
+ - [x] **Coder:** Update `EventLogViewModel` to consume shared location and gate the "MARK RESOLVED" action.
+ - [x] **Reviewer:** Verify that distant incidents in the log display physical distance and lock resolution.

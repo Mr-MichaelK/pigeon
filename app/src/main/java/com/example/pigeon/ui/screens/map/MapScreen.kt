@@ -86,7 +86,6 @@ fun MapScreen(
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     val verificationRadiusMeters = 500.0
     
-    var selectedEvent by remember { mutableStateOf<Event?>(null) }
     var showReportingWizard by remember { mutableStateOf(false) }
     var hasInitialZoomed by remember { mutableStateOf(false) }
     
@@ -129,13 +128,13 @@ fun MapScreen(
                     val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
                     Log.d("MAP_DEBUG", "🔄 Initializing with Permanent Offline Style: $mbtilesUri")
                     map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { style: Style ->
-                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
                     }
                 } catch (e: Exception) {
                     Log.e("MAP_DEBUG", "❌ Offline style loading failed: ${e.message}")
                     // Fallback to direct asset (might fail if MBTiles uri isn't replaced, but best we can do)
                     map.setStyle("asset://style-offline.json") { style: Style ->
-                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> selectedEvent = event })
+                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
                     }
                 }
                 
@@ -165,6 +164,7 @@ fun MapScreen(
                 try {
                     map.locationComponent.lastKnownLocation?.let { 
                         userLocation = LatLng(it.latitude, it.longitude)
+                        viewModel.updateLocation(userLocation!!)
                     }
                 } catch (e: Exception) {}
             }
@@ -186,7 +186,10 @@ fun MapScreen(
         val listener = object : LocationEngineCallback<LocationEngineResult> {
             override fun onSuccess(result: LocationEngineResult?) {
                 result?.lastLocation?.let { location ->
-                    userLocation = LatLng(location.latitude, location.longitude)
+                    val latLng = LatLng(location.latitude, location.longitude)
+                    if (hasInitialZoomed) {
+                        viewModel.updateLocation(latLng)
+                    }
                 }
             }
             override fun onFailure(exception: Exception) {}
@@ -366,13 +369,14 @@ fun MapScreen(
                 }
             }
 
-            // Event Detail Sheet
-            selectedEvent?.let { event ->
+            // Event Details Sheet
+            uiState.selectedEvent?.let { event ->
                 EventDetailSheet(
                     event = event,
-                    userLocation = userLocation,
-                    onDismiss = { selectedEvent = null },
-                    onResolve = viewModel::onResolveEvent
+                    isWithinRadius = uiState.isWithinRadius,
+                    distanceMeters = uiState.distanceMeters,
+                    onDismiss = { viewModel.onEventSelected(null) },
+                    onResolve = { viewModel.onResolveEvent(it) }
                 )
             }
 

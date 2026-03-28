@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.repository.EventRepository
+import com.example.pigeon.domain.repository.LocationRepository
 import com.example.pigeon.domain.usecase.EventFilter
 import com.example.pigeon.domain.usecase.GetEventsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import org.maplibre.android.geometry.LatLng
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -15,7 +17,8 @@ data class EventLogUiState(
     val events: List<Event> = emptyList(),
     val isLoading: Boolean = false,
     val selectedFilter: EventFilter = EventFilter.ALL,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val userLocation: LatLng? = null
 )
 
 enum class EventFilter {
@@ -25,7 +28,8 @@ enum class EventFilter {
 @HiltViewModel
 class EventLogViewModel @Inject constructor(
     private val getEventsUseCase: GetEventsUseCase,
-    private val eventRepository: EventRepository
+    private val eventRepository: EventRepository,
+    private val locationRepository: LocationRepository
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow(EventFilter.ALL)
@@ -34,16 +38,18 @@ class EventLogViewModel @Inject constructor(
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<EventLogUiState> = combine(
         _selectedFilter,
-        _searchQuery
-    ) { filter, query ->
-        filter to query
-    }.flatMapLatest { (filter, query) ->
+        _searchQuery,
+        locationRepository.userLocation
+    ) { filter, query, location ->
+        Triple(filter, query, location)
+    }.flatMapLatest { (filter, query, location) ->
         getEventsUseCase(filter, query).map { events ->
             EventLogUiState(
                 events = events,
                 isLoading = false,
                 selectedFilter = filter,
-                searchQuery = query
+                searchQuery = query,
+                userLocation = location
             )
         }
     }.stateIn(
@@ -63,7 +69,7 @@ class EventLogViewModel @Inject constructor(
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
     }
-    
+     
     fun onResolveEvent(eventId: String) {
         viewModelScope.launch {
             eventRepository.resolveEvent(eventId)
