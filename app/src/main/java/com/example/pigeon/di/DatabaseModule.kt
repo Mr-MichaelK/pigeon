@@ -2,9 +2,12 @@ package com.example.pigeon.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.pigeon.data.local.MIGRATION_2_3
+import com.example.pigeon.data.local.MIGRATION_3_4
 import com.example.pigeon.data.local.PigeonDatabase
 import com.example.pigeon.data.local.dao.UserDao
 import com.example.pigeon.data.local.dao.EventDao
+import com.example.pigeon.data.local.dao.VerificationDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,9 +15,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Hilt module for providing database-related dependencies.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -28,17 +28,17 @@ object DatabaseModule {
             context,
             PigeonDatabase::class.java,
             "pigeon_ledger.db"
-        ).fallbackToDestructiveMigration()
-         .build()
+        )
+        .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+        .build()
     }
 
     @Provides
-    fun provideUserDao(db: PigeonDatabase): UserDao {
-        return db.userDao()
-    }
+    fun provideUserDao(db: PigeonDatabase): UserDao = db.userDao()
 
     @Provides
-    fun provideEventDao(db: PigeonDatabase): EventDao {
-        return db.eventDao()
-    }
+    fun provideEventDao(db: PigeonDatabase): EventDao = db.eventDao()
+
+    @Provides
+    fun provideVerificationDao(db: PigeonDatabase): VerificationDao = db.verificationDao()
 }

@@ -17,6 +17,9 @@ import com.example.pigeon.proto.PigeonEvent
 import com.example.pigeon.proto.PigeonPayload
 import com.example.pigeon.proto.SyncItem
 import com.example.pigeon.proto.SyncManifest
+import com.example.pigeon.proto.VerificationMessage
+import com.example.pigeon.data.local.dao.VerificationDao
+import com.example.pigeon.data.local.entities.VerificationEntity
 import com.google.android.gms.nearby.Nearby
 import kotlinx.coroutines.Job
 import com.google.android.gms.nearby.connection.AdvertisingOptions
@@ -47,7 +50,8 @@ import javax.inject.Singleton
 @Singleton
 class NearbySyncManagerImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val eventRepository: EventRepository
+    private val eventRepository: EventRepository,
+    private val verificationDao: VerificationDao
 ) : NearbySyncManager {
 
     private val TAG = "[MESH_RADIO]"
@@ -267,6 +271,10 @@ class NearbySyncManagerImpl @Inject constructor(
                         Log.d(TAG, "Received PigeonEvent from $endpointId: ${pigeonPayload.event.eventId}")
                         handleReceivedEvent(endpointId, pigeonPayload.event)
                     }
+                    pigeonPayload.hasVerification() -> {
+                        Log.d(TAG, "Received VerificationMessage from $endpointId for event ${pigeonPayload.verification.eventId}")
+                        handleReceivedVerification(endpointId, pigeonPayload.verification)
+                    }
                     else -> {
                         Log.w(TAG, "Received unknown payload type from $endpointId")
                     }
@@ -343,6 +351,21 @@ class NearbySyncManagerImpl @Inject constructor(
         startProximityWave()
         
         checkSyncCompletion(endpointId)
+    }
+
+    private suspend fun handleReceivedVerification(endpointId: String, msg: VerificationMessage) {
+        val entity = VerificationEntity(
+            id = msg.id,
+            eventId = msg.eventId,
+            signerId = msg.signerId,
+            isConfirm = msg.isConfirm,
+            timestamp = msg.timestamp
+        )
+        verificationDao.insertVerification(entity)
+        Log.d(TAG, "Upserted verification for ${msg.eventId} from ${msg.signerId}")
+        
+        // Propagation Wave: relay verification onward
+        startProximityWave()
     }
 
     private fun checkSyncCompletion(endpointId: String) {
@@ -572,6 +595,17 @@ class NearbySyncManagerImpl @Inject constructor(
     override fun broadcastIncident(event: PigeonEvent) {
         Log.d(TAG, "Broadcasting Immediate Incident: ${event.eventId}")
         val payload = PigeonPayload.newBuilder().setEvent(event).build()
+        val bytes = Payload.fromBytes(payload.toByteArray())
+        _nearbyPeers.value.filter { it.isConnected }.forEach { peer ->
+            if (peer.deviceId != MOCK_PEER_ID) {
+                connectionsClient.sendPayload(peer.deviceId, bytes)
+            }
+        }
+    }
+
+    override fun broadcastVerification(verification: VerificationMessage) {
+        Log.d(TAG, "Broadcasting Verification: ${verification.id} for event ${verification.eventId}")
+        val payload = PigeonPayload.newBuilder().setVerification(verification).build()
         val bytes = Payload.fromBytes(payload.toByteArray())
         _nearbyPeers.value.filter { it.isConnected }.forEach { peer ->
             if (peer.deviceId != MOCK_PEER_ID) {

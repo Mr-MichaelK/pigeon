@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pigeon.R
@@ -32,10 +33,12 @@ import com.example.pigeon.ui.util.LocationUtils
 @Composable
 fun EventDetailSheet(
     event: Event,
+    trustScore: com.example.pigeon.domain.model.TrustScore,
     isWithinRadius: Boolean,
     distanceMeters: Double?,
     onDismiss: () -> Unit,
-    onResolve: (String) -> Unit
+    onResolve: (String) -> Unit,
+    onVerify: (Boolean) -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -56,7 +59,7 @@ fun EventDetailSheet(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Surface(
-                    color = Color(0xFFFFF9C4), // Light warning yellow
+                    color = Color(0xFFFFF9C4),
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, Color(0xFFFBC02D)),
                     modifier = Modifier
@@ -107,7 +110,25 @@ fun EventDetailSheet(
                         color = MeshColor.TextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    StatusBadge(isResolved = event.isResolved)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusBadge(isResolved = event.isResolved)
+                        if (trustScore.isVerified) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = MeshColor.Primary.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(4.dp),
+                                border = BorderStroke(0.5.dp, MeshColor.Primary)
+                            ) {
+                                Text(
+                                    "VERIFIED",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MeshColor.Primary,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                    }
                 }
                 
                 // Type Icon Surface
@@ -170,9 +191,7 @@ fun EventDetailSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Grid of Data Pills
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Location Row
                 MetadataPill(
                     icon = R.drawable.my_location,
                     label = "COORDINATES",
@@ -195,13 +214,115 @@ fun EventDetailSheet(
                 }
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // DISTRIBUTED TRUST — compact inline section
+            Surface(
+                color = MeshColor.Surface,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MeshColor.Border),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "CONSENSUS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MeshColor.TextSecondary,
+                                fontSize = 9.sp
+                            )
+                            Text(
+                                "${trustScore.percentage}% Trust",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                color = if (trustScore.isVerified) MeshColor.SuccessGreen else MeshColor.Primary
+                            )
+                        }
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            VerificationMetric(
+                                icon = Icons.Outlined.ThumbUp,
+                                count = trustScore.totalConfirms,
+                                tint = MeshColor.SuccessGreen
+                            )
+                            VerificationMetric(
+                                icon = Icons.Outlined.ThumbDown,
+                                count = trustScore.totalContradicts,
+                                tint = MeshColor.EmergencyRed
+                            )
+                        }
+                    }
+                    
+                    val totalVotes = trustScore.totalConfirms + trustScore.totalContradicts
+                    if (totalVotes < 3) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "↳ $totalVotes/3 peers required to resolve",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MeshColor.AlertOrange,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    
+                    if (!event.isResolved) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { onVerify(true) },
+                                enabled = isWithinRadius,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
+                            ) {
+                                Icon(Icons.Outlined.GppGood, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "CONFIRM",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            
+                            OutlinedButton(
+                                onClick = { onVerify(false) },
+                                enabled = isWithinRadius,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeshColor.EmergencyRed),
+                                border = BorderStroke(1.dp, if (isWithinRadius) MeshColor.EmergencyRed else MeshColor.Border)
+                            ) {
+                                Icon(Icons.Outlined.Report, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "FALSE ALARM",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // Action: Resolve Button
             if (!event.isResolved) {
                 Button(
                     onClick = { onResolve(event.eventId) },
-                    enabled = isWithinRadius,
+                    enabled = isWithinRadius && trustScore.isVerified,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -213,7 +334,14 @@ fun EventDetailSheet(
                 ) {
                     Icon(Icons.Outlined.Check, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (isWithinRadius) "RESOLVE INCIDENT" else "TOO FAR TO VERIFY", fontWeight = FontWeight.Black)
+                    Text(
+                        text = when {
+                            !isWithinRadius -> "TOO FAR TO VERIFY"
+                            !trustScore.isVerified -> "WAITING FOR CONSENSUS"
+                            else -> "RESOLVE INCIDENT"
+                        }, 
+                        fontWeight = FontWeight.Black
+                    )
                 }
             } else {
                 OutlinedButton(
@@ -226,6 +354,20 @@ fun EventDetailSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun VerificationMetric(icon: ImageVector, count: Int, tint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MeshColor.TextPrimary
+        )
     }
 }
 
@@ -261,7 +403,7 @@ private fun StatusBadge(isResolved: Boolean) {
 
 @Composable
 private fun MetadataPill(
-    icon: Any, // Int resource or ImageVector
+    icon: Any,
     label: String,
     value: String,
     modifier: Modifier = Modifier
@@ -308,4 +450,3 @@ private fun MetadataPill(
         }
     }
 }
-

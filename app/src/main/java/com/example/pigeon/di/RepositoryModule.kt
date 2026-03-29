@@ -6,15 +6,14 @@ import com.example.pigeon.data.repository.local.LocalUserRepository
 import com.example.pigeon.domain.repository.UserRepository
 import com.example.pigeon.data.repository.EventRepositoryImpl
 import com.example.pigeon.domain.repository.EventRepository
+import com.example.pigeon.data.repository.VerificationRepositoryImpl
+import com.example.pigeon.domain.repository.VerificationRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Hilt module for binding repository interfaces to implementations.
- */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
@@ -36,4 +35,10 @@ abstract class RepositoryModule {
     abstract fun bindLocationRepository(
         locationRepositoryImpl: LocationRepositoryImpl
     ): LocationRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindVerificationRepository(
+        verificationRepositoryImpl: VerificationRepositoryImpl
+    ): VerificationRepository
 }

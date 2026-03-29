@@ -74,9 +74,19 @@ import kotlinx.coroutines.awaitCancellation
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = hiltViewModel(),
-    reportViewModel: ReportViewModel = hiltViewModel()
+    reportViewModel: ReportViewModel = hiltViewModel(),
+    detailViewModel: EventDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val detailTrustScore by detailViewModel.trustScore.collectAsStateWithLifecycle()
+    
+    // Sync Selected Event ID to Detail ViewModel
+    LaunchedEffect(uiState.selectedEvent?.eventId) {
+        uiState.selectedEvent?.eventId?.let { id ->
+            detailViewModel.onEventSelected(id)
+        }
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -128,13 +138,13 @@ fun MapScreen(
                     val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
                     Log.d("MAP_DEBUG", "🔄 Initializing with Permanent Offline Style: $mbtilesUri")
                     map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { style: Style ->
-                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
+                        setupMapStyle(this@apply, map, style, context, uiState.events, uiState.trustScores, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
                     }
                 } catch (e: Exception) {
                     Log.e("MAP_DEBUG", "❌ Offline style loading failed: ${e.message}")
                     // Fallback to direct asset (might fail if MBTiles uri isn't replaced, but best we can do)
                     map.setStyle("asset://style-offline.json") { style: Style ->
-                        setupMapStyle(this@apply, map, style, context, uiState.events, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
+                        setupMapStyle(this@apply, map, style, context, uiState.events, uiState.trustScores, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
                     }
                 }
                 
@@ -221,12 +231,12 @@ fun MapScreen(
 
     // Connection state removed - Map stays offline
 
-    // React to event changes OR zoom threshold cross to update symbols
+    // React to event changes, trust score updates, OR zoom threshold cross to update symbols
     val showTitles = currentZoom >= zoomThreshold
-    LaunchedEffect(uiState.events, showTitles) {
+    LaunchedEffect(uiState.events, uiState.trustScores, showTitles) {
         symbolManagerState.value?.let { manager ->
             mapLibreMap?.getStyle { style: Style ->
-                updateSymbols(context, manager, style, uiState.events, showTitles)
+                updateSymbols(context, manager, style, uiState.events, uiState.trustScores, showTitles)
             }
         }
     }
@@ -373,10 +383,12 @@ fun MapScreen(
             uiState.selectedEvent?.let { event ->
                 EventDetailSheet(
                     event = event,
+                    trustScore = detailTrustScore,
                     isWithinRadius = uiState.isWithinRadius,
                     distanceMeters = uiState.distanceMeters,
                     onDismiss = { viewModel.onEventSelected(null) },
-                    onResolve = { viewModel.onResolveEvent(it) }
+                    onResolve = { viewModel.onResolveEvent(it) },
+                    onVerify = { detailViewModel.onVerify(it) }
                 )
             }
 
@@ -544,6 +556,7 @@ private fun setupMapStyle(
     style: Style,
     context: android.content.Context,
     events: List<Event>,
+    trustScores: Map<String, com.example.pigeon.domain.model.TrustScore>,
     zoom: Double,
     zoomThreshold: Double,
     symbolManagerState: MutableState<SymbolManager?>,
@@ -562,6 +575,14 @@ private fun setupMapStyle(
     style.addImage("pin-supplies", suppliesPin)
     style.addImage("pin-conflict", conflictPin)
     style.addImage("pin-custom", customPin)
+
+    // Register faded variants (40% alpha)
+    style.addImage("pin-fire-faded", createFadedBitmap(firePin, 102))
+    style.addImage("pin-medical-faded", createFadedBitmap(medicalPin, 102))
+    style.addImage("pin-supplies-faded", createFadedBitmap(suppliesPin, 102))
+    style.addImage("pin-conflict-faded", createFadedBitmap(conflictPin, 102))
+    style.addImage("pin-custom-faded", createFadedBitmap(customPin, 102))
+
     defaultPin?.let { style.addImage("default-pin", it) }
 
     // 2. Clear old manager if exists
@@ -604,7 +625,7 @@ private fun setupMapStyle(
 
     // 6. Initial content
     enableLocationComponent(map, style, context)
-    updateSymbols(context, manager, style, events, zoom >= zoomThreshold)
+    updateSymbols(context, manager, style, events, trustScores, zoom >= zoomThreshold)
     
     // MAP_DEBUG: Force camera to Lebanon if offline style is active
     if (style.url?.contains("style-offline.json") == true) {
@@ -630,9 +651,19 @@ private fun enableLocationComponent(map: MapLibreMap, style: Style, context: and
     }
 }
 
-private fun updateSymbols(context: android.content.Context, manager: SymbolManager?, style: Style, events: List<Event>, showTitles: Boolean) {
+private fun updateSymbols(
+    context: android.content.Context, 
+    manager: SymbolManager?, 
+    style: Style, 
+    events: List<Event>, 
+    trustScores: Map<String, com.example.pigeon.domain.model.TrustScore>,
+    showTitles: Boolean
+) {
     manager?.deleteAll()
     events.forEach { event ->
+        val trustScore = trustScores[event.eventId] ?: com.example.pigeon.domain.model.TrustScore.EMPTY
+        val isVerified = trustScore.isVerified
+        
         val iconRes = when (event.eventType) {
             EventType.FIRE -> R.drawable.local_fire_department_24dp
             EventType.MEDICAL -> R.drawable.medical_services_24dp
@@ -652,6 +683,9 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
         if (showTitles) {
             // COMBINED VIEW: Icon + Label welded together
             val combinedId = "combined-${event.eventId}"
+            // Note: Combined currently doesn't support easy fading without more bitmap logic. 
+            // For now, only the Icon Only view will reflect trust for "Quick Glance" as requested.
+            // But we can add a simple suffix to the cache key if we wanted to support it.
             if (style.getImage(combinedId) == null) {
                 createCombinedPinFromDrawable(context, iconRes, color, event.title.uppercase())?.let {
                     style.addImage(combinedId, it)
@@ -668,13 +702,15 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
             )
         } else {
             // ICON ONLY VIEW
-                val iconImage = when (event.eventType) {
-                    EventType.FIRE -> "pin-fire"
-                    EventType.MEDICAL -> "pin-medical"
-                    EventType.SUPPLIES -> "pin-supplies"
-                    EventType.CONFLICT -> "pin-conflict"
-                    EventType.CUSTOM, EventType.SOS -> "pin-custom"
-                }
+            val iconBase = when (event.eventType) {
+                EventType.FIRE -> "pin-fire"
+                EventType.MEDICAL -> "pin-medical"
+                EventType.SUPPLIES -> "pin-supplies"
+                EventType.CONFLICT -> "pin-conflict"
+                EventType.CUSTOM, EventType.SOS -> "pin-custom"
+            }
+            
+            val iconImage = if (isVerified) iconBase else "$iconBase-faded"
 
             manager?.create(
                 SymbolOptions()
@@ -684,6 +720,16 @@ private fun updateSymbols(context: android.content.Context, manager: SymbolManag
             )
         }
     }
+}
+
+private fun createFadedBitmap(src: Bitmap, alpha: Int): Bitmap {
+    val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(out)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        this.alpha = alpha
+    }
+    canvas.drawBitmap(src, 0f, 0f, paint)
+    return out
 }
 
 private fun createCombinedPinFromDrawable(

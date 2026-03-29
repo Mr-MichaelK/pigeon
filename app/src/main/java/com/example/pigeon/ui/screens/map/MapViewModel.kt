@@ -3,17 +3,17 @@ package com.example.pigeon.ui.screens.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pigeon.domain.model.Event
-import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.model.MapMetadata
+import com.example.pigeon.domain.model.TrustScore
 import com.example.pigeon.domain.repository.EventRepository
 import com.example.pigeon.domain.repository.LocationRepository
+import com.example.pigeon.domain.repository.VerificationRepository
 import com.example.pigeon.domain.network.NearbySyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import org.maplibre.android.geometry.LatLng
 import com.example.pigeon.ui.util.LocationUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.UUID
 import javax.inject.Inject
 
 data class MapUiState(
@@ -25,6 +25,7 @@ data class MapUiState(
         lastSyncMinutes = 5
     ),
     val events: List<Event> = emptyList(),
+    val trustScores: Map<String, TrustScore> = emptyMap(),
     val selectedEvent: Event? = null,
     val isWithinRadius: Boolean = false,
     val distanceMeters: Double? = null,
@@ -35,6 +36,7 @@ data class MapUiState(
 class MapViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val locationRepository: LocationRepository,
+    private val verificationRepository: VerificationRepository,
     private val nearbySyncManager: NearbySyncManager
 ) : ViewModel() {
 
@@ -48,30 +50,64 @@ class MapViewModel @Inject constructor(
 
     private val _selectedEvent = MutableStateFlow<Event?>(null)
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<MapUiState> = combine(
         _metadata,
         eventRepository.getAllEvents(),
         locationRepository.userLocation,
         _selectedEvent
     ) { metadata, events, userLoc, selectedEvent ->
+        metadata to events to userLoc to selectedEvent
+    }.flatMapLatest { (triple, selectedEvent) ->
+        val (pair, userLoc) = triple
+        val (metadata, events) = pair
+        
+        // Combine all event trust scores into a single flow
+        val trustFlows = events.map { event ->
+            verificationRepository.getTrustScore(event.eventId).map { score ->
+                event.eventId to score
+            }
+        }
+        
+        if (trustFlows.isEmpty()) {
+            flowOf(emptyMap<String, TrustScore>()).map { trustMap ->
+                buildMapUiState(metadata, events, trustMap, userLoc, selectedEvent)
+            }
+        } else {
+            combine(trustFlows) { arrays ->
+                arrays.toMap()
+            }.map { trustMap ->
+                buildMapUiState(metadata, events, trustMap, userLoc, selectedEvent)
+            }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = MapUiState()
+    )
+
+    private fun buildMapUiState(
+        metadata: MapMetadata,
+        events: List<Event>,
+        trustMap: Map<String, TrustScore>,
+        userLoc: LatLng?,
+        selectedEvent: Event?
+    ): MapUiState {
         val distance = if (userLoc != null && selectedEvent != null) {
             LocationUtils.calculateDistance(userLoc.latitude, userLoc.longitude, selectedEvent.latitude, selectedEvent.longitude)
         } else null
         
         val isQualified = distance != null && distance <= 500.0
         
-        MapUiState(
+        return MapUiState(
             metadata = metadata,
             events = events,
+            trustScores = trustMap,
             selectedEvent = selectedEvent,
             isWithinRadius = isQualified,
             distanceMeters = distance
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = MapUiState()
-    )
+    }
 
     init {
         // Mock data population disabled for persistent operation

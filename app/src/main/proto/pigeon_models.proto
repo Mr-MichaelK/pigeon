@@ -38,5 +38,14 @@ message PigeonPayload {
   oneof payload {
     PigeonEvent event = 1;
     SyncManifest manifest = 2;
+    VerificationMessage verification = 3;
   }
+}
+
+message VerificationMessage {
+  string id = 1;
+  string event_id = 2;
+  string signer_id = 3;
+  bool is_confirm = 4;
+  int64 timestamp = 5;
 }

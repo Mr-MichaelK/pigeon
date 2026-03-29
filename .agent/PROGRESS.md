@@ -9,7 +9,7 @@
 - [x] Multi-Agent System Prompts & Engineering Standards established
 - [x] UI/UX Screen Specifications finalized
 
-## 🟡 PHASE 1: Identity & Gateway (IN PROGRESS)
+## � PHASE 1: Identity & Gateway (COMPLETED)
 ### Task 1.1: Local Persistence (User Identity)
 - [x] **Architect:** Define Room Entity for User Profile including the 72-hour lock timestamp.
 - [x] **Coder:** Implement Room database setup and LocalUserRepository.
@@ -32,7 +32,7 @@
 - [x] **Coder:** Implement the Bottom Navigation Bar and the flow between core screens.
 - [x] **Reviewer:** Ensure smooth transitions and correct backstack handling.
 
-## 🟡 PHASE 2: Spatial Awareness (Mock Data)
+## � PHASE 2: Spatial Awareness (Mock Data) (COMPLETED)
 ### Task 2.1: MapLibre Integration
 - [x] **Architect:** Design the MapView container and Plan implementation.
 - [x] **Coder:** Integrate MapLibre SDK and implement the Top Pill (Lat/Long display).
@@ -131,3 +131,35 @@
  - [x] **Architect:** Centralize location management in `LocationRepository` for cross-screen state sharing.
  - [x] **Coder:** Update `EventLogViewModel` to consume shared location and gate the "MARK RESOLVED" action.
  - [x] **Reviewer:** Verify that distant incidents in the log display physical distance and lock resolution.
+ 
+## � PHASE 6: Distributed Trust & Reputation (COMPLETED)
+### Task 6.1: The Verification Data Model (Sidecar Entity)
+- [x] **Architect:** Define the Verification Room Entity linked to EventID. Include fields for signerID, isConfirm (Boolean), and timestamp.
+- [x] **Coder:** Implement the Many-to-One relationship. Ensure the Protobuf message for sync is optimized for "Delta-only" transfers.
+- [x] **Reviewer:** Audit the database to ensure a user cannot submit multiple verifications for the same EventID (Unique constraint).
+
+### Task 6.2: The Hybrid Consensus Engine
+- [x] **Architect:** Define the 80% Rule: TrustScore = (TotalConfirms / (TotalConfirms + TotalContradicts)) * 100. isVerified = true if TrustScore >= 80 AND TotalConfirms >= 3.
+- [x] **Coder:** Implement real-time trust calculation in the Repository layer using Room flows.
+- [x] **Reviewer:** Test edge cases: Ensure events fail verification with < 3 confirmations even if 100% positive.
+
+### Task 6.3: "Quick Glance" Map UI
+- [x] **Architect:** Define visual states for Map Pins: Verified (Solid) vs. Unverified (Faded/Semi-transparent).
+- [x] **Coder:** Implement pre-rasterized bitmap strategy for alpha-blended pins in MapLibre SymbolManager.
+- [x] **Reviewer:** Ensure pins update instantly on the map when a sync completes via reactive StateFlow.
+
+### Task 6.4: The Verification Sidecar UI
+- [x] **Architect:** Design the EventDetailSheet layout to show the hybrid Consensus Score and peer count.
+- [x] **Coder:** Implement the "DISTRIBUTED TRUST" section with Confirm/Contradict buttons and proximity locks.
+- [x] **Reviewer:** Verify the "Resolve" button logic now requires a verified consensus state before allowing closure.
+
+### Task 6.5: Mesh Propagation & Sync Integration
+- [x] **Coder:** Update NearbySyncManager to broadcast VerificationMessages and relay them across the mesh.
+- [x] **Reviewer:** Verify the full consensus loop—votes cast on one node reach all other nodes and update their local map pins.
+
+### Summary of Phase 6: Distributed Trust & Reputation System
+*   **Trust Model**: Implemented a local consensus engine that calculates trust scores (80% threshold) based on peer votes.
+*   **Verification Sidecar**: Added a tactical UI overlay to `EventDetailSheet` that allows responders to confirm or contradict incidents with a single tap, enforced by a **500m Proximity Lock**.
+*   **Mesh Propagation**: Integrated `VerificationMessage` into the P2P protocol, enabling real-time trust synchronization across all connected nodes.
+*   **Reactive Pins**: Updated MapLibre symbol management to visually distinguish between unverified (40% alpha) and verified (100% alpha) incident markers, improving situational awareness.
+

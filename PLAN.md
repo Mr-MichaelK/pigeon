@@ -1,33 +1,84 @@
-# PLAN.md: Task 5.6 - Event Log Proximity Lock
+# PLAN.md — Task 6.3: "Quick Glance" Map UI
 
 ## Objective
-Enforce the 500m proximity verification rule on the Event Log screen, preventing users from resolving incidents they are not physically close to.
+Make map pins visually distinguish Verified vs. Unverified events at a glance.
+
+---
+
+## Key Constraint: SymbolManager Bitmap Architecture
+
+The app renders pins as **pre-rasterized Bitmaps** added to the MapLibre style (`style.addImage()`)
+and drawn via `SymbolManager`. Per-symbol opacity is NOT natively supported through the annotations
+plugin — it only provides `withIconSize()`, `withIconImage()`, etc.
+
+**Solution:**
+For each event type, pre-render **two** bitmap variants at style setup time:
+- **`pin-{type}`** — Full opacity (verified / high trust)
+- **`pin-{type}-faded`** — `alpha = 0.4` (unverified / low trust)
+
+At symbol creation time in `updateSymbols()`, pick the correct image key based on the event's
+current `TrustScore.isVerified` flag. When trust data updates (DB → Flow → ViewModel), trigger
+`updateSymbols()` again, which redraws all pins.
+
+---
+
+## Architecture: Trust Data Flow to Map
+
+### Problem
+`updateSymbols()` runs outside Compose — it's a private Kotlin function called from a
+`LaunchedEffect`. It cannot directly consume a `StateFlow` inside `LaunchedEffect` easily when
+mixing with `uiState`.
+
+### Solution: Embed trust scores in `MapUiState`
+
+1. **`MapViewModel`**: Inject `VerificationRepository`. Build a new combined flow that maps
+   each event to its `TrustScore`, emitting `Map<String, TrustScore>` (keyed by `eventId`).
+   Add `val trustScores: Map<String, TrustScore>` to `MapUiState`.
+
+2. **`MapScreen.kt` `LaunchedEffect`**: React to both `uiState.events` AND `uiState.trustScores`
+   changes to re-invoke `updateSymbols()`.
+
+3. **`updateSymbols()`**: Add `trustScores: Map<String, TrustScore>` parameter.
+   Inside the function, look up each event's trust score and pick `pin-{type}` or `pin-{type}-faded`.
+
+---
+
+## Bitmap Rendering: Faded Variant
+
+A helper `createFadedPinBitmap(bitmap: Bitmap, alpha: Int): Bitmap` applies pixel-level alpha
+multiplication to create the 40% opacity version without a second drawable inflate:
+
+```kotlin
+private fun createFadedBitmap(src: Bitmap, alpha: Int): Bitmap {
+    val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    val paint = Paint().apply { this.alpha = alpha }  // 102 ≈ 0.4 * 255
+    canvas.drawBitmap(src, 0f, 0f, paint)
+    return out
+}
+```
+
+---
+
+## Layer Ordering
+
+The proximity circle layer (`proximity-layer`) is already added via `style.addLayer()` BEFORE
+symbols are created by `SymbolManager`. The `SymbolManager` always adds its layer on top.
+**No changes needed for layer ordering.**
+
+---
 
 ## Files to Modify
-1. `[MODIFY]` [EventLogViewModel.kt](file:///Users/malekbaghdadi/Downloads/pigeon/app/src/main/java/com/example/pigeon/ui/screens/log/EventLogViewModel.kt)
-2. `[MODIFY]` [EventLogScreen.kt](file:///Users/malekbaghdadi/Downloads/pigeon/app/src/main/java/com/example/pigeon/ui/screens/log/EventLogScreen.kt)
 
-## Logic Patterns
+| Action   | File                                               |
+|----------|----------------------------------------------------|
+| [MODIFY] | `ui/screens/map/MapViewModel.kt` — add trust flow to `MapUiState` |
+| [MODIFY] | `ui/screens/map/MapScreen.kt` — faded bitmap registration, `LaunchedEffect` trigger, `updateSymbols` signature update |
 
-### 1. EventLogViewModel.kt (State Bridge)
-- **UI State**: Add `val userLocation: LatLng? = null` to `EventLogUiState`.
-- **Action**: Implement `onUserLocationChanged(location: LatLng)` to update the state.
-- **Verification Refinement**: Since the resolve action is a simple repository call, the UI will handle the gating via the `userLocation` state.
-
-### 2. EventLogScreen.kt (Location Tracking & UI Gating)
-- **Location Listener**: Use a `LaunchedEffect` to initialize MapLibre's `LocationEngine` (independent of MapView) and feed location updates to the ViewModel at 1Hz.
-- **EventLogItem Updates**:
-    - Pass `uiState.userLocation` to each `EventLogItem`.
-    - Inside `EventLogItem`, use `LocationUtils.isWithinRange` to calculate `isWithinRadius`.
-    - **UI Feedback**:
-        - Disable the "MARK RESOLVED" button if `!isWithinRadius`.
-        - Change button text to "TOO FAR" when disabled.
-        - Add a small distance indicator (e.g., "600m away") next to the button for clarity.
+---
 
 ## Verification Plan
-1. **Mock Testing**: Verify the resolve button toggle by simulating location changes.
-2. **Naming Consistency**: Ensure `isWithinRadius` is the logical gating factor used for the resolve action.
-3. **UX Balance**: Ensure the distance indicator is subtle but legible.
-
-## Next Step
-Wait for user approval of PLAN.md.
+1. `./gradlew assembleDebug` — zero errors
+2. Events with 0 verifications appear faded (40% opacity)
+3. Events after 3+ confirms at >= 80% appear at full opacity
+4. Proximity circle remains below all pins
