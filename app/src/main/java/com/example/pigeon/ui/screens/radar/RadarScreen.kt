@@ -50,8 +50,7 @@ import kotlin.math.sin
 
 @Composable
 fun RadarScreen(
-    viewModel: RadarViewModel = hiltViewModel(),
-    onOpenDrawer: () -> Unit = {}
+    viewModel: RadarViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -100,26 +99,6 @@ fun RadarScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onOpenDrawer) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Open Drawer",
-                        tint = MeshColor.TextPrimary
-                    )
-                }
-                Text(
-                    text = "RADAR SCAN",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = MeshColor.TextPrimary,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-            
             Spacer(modifier = Modifier.height(16.dp))
             
             PowerStateToggle(

@@ -56,6 +56,7 @@ import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.style.layers.Property
 import android.content.Context
+import android.os.Looper
 import androidx.compose.ui.graphics.toArgb
 import java.io.File
 import kotlinx.coroutines.withContext
@@ -76,8 +77,7 @@ import kotlinx.coroutines.awaitCancellation
 fun MapScreen(
     viewModel: MapViewModel = hiltViewModel(),
     reportViewModel: ReportViewModel = hiltViewModel(),
-    detailViewModel: EventDetailViewModel = hiltViewModel(),
-    onOpenDrawer: () -> Unit = {}
+    detailViewModel: EventDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val detailTrustScore by detailViewModel.trustScore.collectAsStateWithLifecycle()
@@ -208,7 +208,13 @@ fun MapScreen(
         }
         
         val request = LocationEngineRequest.Builder(1000L).build()
-        engine.requestLocationUpdates(request, listener, android.os.Looper.getMainLooper())
+        if (org.maplibre.android.location.permissions.PermissionsManager.areLocationPermissionsGranted(context)) {
+            try {
+                engine.requestLocationUpdates(request, listener, Looper.getMainLooper())
+            } catch (e: SecurityException) {
+                Log.e("MAP_DEBUG", "SecurityException during location updates: ${e.message}")
+            }
+        }
         
         try {
             awaitCancellation()
@@ -295,8 +301,8 @@ fun MapScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Sticky Header: Mesh Status
-        MeshHeader(onOpenDrawer = onOpenDrawer)
+        // Sticky Header: Mesh Status (Full Width)
+        MeshHeader()
 
         Box(modifier = Modifier.weight(1f)) {
             AndroidView(
@@ -408,15 +414,15 @@ fun MapScreen(
                         )
                     },
                     currentLatitude = uiState.metadata.latitude,
-                    currentLongitude = uiState.metadata.longitude
-                )
-            }
+                    currentLongitude = uiState.metadata.longitude)
         }
     }
 }
 
+}
+
 @Composable
-fun MeshHeader(onOpenDrawer: () -> Unit) {
+fun MeshHeader() {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -427,19 +433,9 @@ fun MeshHeader(onOpenDrawer: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onOpenDrawer) {
-                Icon(
-                    imageVector = Icons.Outlined.Menu,
-                    contentDescription = "Open Drawer",
-                    tint = MeshColor.TextPrimary
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
             Row(
                 modifier = Modifier
                     .weight(1f),
@@ -449,14 +445,15 @@ fun MeshHeader(onOpenDrawer: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Pulse Icon
                     Box(contentAlignment = Alignment.Center) {
-                        val infiniteTransition = rememberInfiniteTransition()
+                        val infiniteTransition = rememberInfiniteTransition(label = "MeshPulse")
                         val pulseAlpha by infiniteTransition.animateFloat(
                             initialValue = 1f,
                             targetValue = 0.2f,
                             animationSpec = infiniteRepeatable(
                                 animation = tween(1500, easing = LinearEasing),
                                 repeatMode = RepeatMode.Reverse
-                            )
+                            ),
+                            label = "PulseAlpha"
                         )
                         
                         Surface(
@@ -483,7 +480,7 @@ fun MeshHeader(onOpenDrawer: () -> Unit) {
                         )
                     }
                     
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
                     
                     Column {
                         Text(
@@ -515,11 +512,11 @@ fun MeshHeader(onOpenDrawer: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         color = MeshColor.TextSecondary,
                         letterSpacing = 1.sp
-                )
+                    )
+                }
             }
         }
     }
-}
 }
 
 @Composable

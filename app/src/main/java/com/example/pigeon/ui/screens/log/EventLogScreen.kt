@@ -33,8 +33,7 @@ import java.util.*
 
 @Composable
 fun EventLogScreen(
-    viewModel: EventLogViewModel,
-    onOpenDrawer: () -> Unit = {}
+    viewModel: EventLogViewModel
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -54,14 +53,6 @@ fun EventLogScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onOpenDrawer) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Open Drawer",
-                        tint = MeshColor.TextPrimary
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
                 EventLogSearchBar(
                     query = uiState.searchQuery,
                     onQueryChange = viewModel::onSearchQueryChanged,
