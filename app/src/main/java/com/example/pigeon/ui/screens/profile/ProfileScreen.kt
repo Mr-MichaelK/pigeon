@@ -184,7 +184,7 @@ fun ProfileHeader(user: User) {
             text = user.nodeName,
             style = MaterialTheme.typography.labelLarge,
             color = MeshColor.TextSecondary,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Black,
             modifier = Modifier.padding(top = 4.dp)
         )
     }
@@ -320,7 +320,7 @@ fun DetailRow(label: String, value: String, isLast: Boolean) {
             text = value,
             style = MaterialTheme.typography.bodyLarge,
             color = MeshColor.TextPrimary,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Black
         )
     }
 }
@@ -403,7 +403,7 @@ fun MeshProfileVerifiedToggle(
                 text = "VERIFIED MESH MEMBER [DEBUG]",
                 color = if (isVerified) MeshColor.SuccessGreen else MeshColor.TextPrimary,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Black
             )
         }
         Switch(
@@ -428,7 +428,7 @@ fun MeshProfileSaveGroup(
         modifier = Modifier
             .fillMaxWidth()
             .background(MeshColor.Surface, RoundedCornerShape(16.dp))
-            .bottomBorder(2.dp, MeshColor.Primary.copy(alpha = 0.2f))
+            .bottomBorder(2.dp, MeshColor.SuccessGreen.copy(alpha = 0.2f))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -471,8 +471,8 @@ fun MeshProfileSaveGroup(
                 .height(64.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MeshColor.Primary,
-                disabledContainerColor = MeshColor.Primary.copy(alpha = 0.5f)
+                containerColor = MeshColor.SuccessGreen,
+                disabledContainerColor = MeshColor.SuccessGreen.copy(alpha = 0.5f)
             ),
             enabled = !isSaving
         ) {
@@ -538,7 +538,7 @@ fun MeshStatisticsSection(user: com.example.pigeon.domain.model.User) {
                 Text(
                     text = "${user.totalSyncs} SUCCESSFUL EXCHANGES",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     color = MeshColor.TextPrimary
                 )
             }
@@ -552,7 +552,7 @@ fun MeshStatisticsSection(user: com.example.pigeon.domain.model.User) {
                 Text(
                     text = "${user.trustScore.toInt()}% OPERATIONAL INTEGRITY",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
                     color = if (user.trustScore >= 80) MeshColor.SuccessGreen else MeshColor.Primary
                 )
             }
@@ -585,7 +585,7 @@ fun TacticalRoleBadge(role: String) {
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelLarge,
             color = MeshColor.TextPrimary,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.Black
         )
     }
 }
@@ -615,7 +615,7 @@ fun SaveIdentityConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MeshColor.Primary),
+                colors = ButtonDefaults.buttonColors(containerColor = MeshColor.SuccessGreen),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text("BROADCAST & LOCK", fontWeight = FontWeight.Bold)

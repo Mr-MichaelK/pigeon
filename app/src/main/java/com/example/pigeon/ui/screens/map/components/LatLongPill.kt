@@ -57,8 +57,7 @@ fun LatLongPill(
             modifier = Modifier.padding(end = 16.dp),
             color = MeshColor.TextPrimary,
             fontSize = 13.sp,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Bold
         )
     }
 }

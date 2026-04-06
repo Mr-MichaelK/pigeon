@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -120,8 +121,8 @@ fun MeshRoleCard(
         ),
         shape = RoundedCornerShape(12.dp),
         border = androidx.compose.foundation.BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) MeshColor.Primary else MeshColor.Border
+            width = if (isSelected) 3.dp else 1.dp,
+            color = if (isSelected) MeshColor.TextPrimary else MeshColor.Border
         )
     ) {
         Column(
@@ -134,7 +135,7 @@ fun MeshRoleCard(
             Text(
                 text = role.title.uppercase(),
                 style = MaterialTheme.typography.labelLarge,
-                color = if (isSelected) MeshColor.Primary else MeshColor.TextPrimary,
+                color = MeshColor.TextPrimary,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
@@ -226,9 +227,10 @@ fun MeshAnonymousToggle(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Hide your display name in the mesh network",
+                text = if (isAnonymous) "PRIVACY ACTIVE: Identity hidden from mesh" else "Hide your display name in the network",
                 style = MaterialTheme.typography.bodySmall,
-                color = MeshColor.TextSecondary
+                color = if (isAnonymous) MeshColor.AssistYellow else MeshColor.TextSecondary,
+                fontWeight = if (isAnonymous) FontWeight.Bold else FontWeight.Normal
             )
         }
         Switch(

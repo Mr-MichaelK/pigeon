@@ -486,12 +486,12 @@ fun MeshHeader() {
                         Text(
                             "MESH ACTIVE",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Black,
                             color = MeshColor.TextPrimary,
                             letterSpacing = 1.sp
                         )
                         Text(
-                            "Connected • Low Latency",
+                            "CONNECTED",
                             style = MaterialTheme.typography.bodySmall,
                             color = MeshColor.TextSecondary
                         )
@@ -502,14 +502,14 @@ fun MeshHeader() {
                     Text(
                         "2m ago",
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Black,
                         color = MeshColor.TextPrimary
                     )
                     Text(
                         "SYNCED",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Black,
                         color = MeshColor.TextSecondary,
                         letterSpacing = 1.sp
                     )

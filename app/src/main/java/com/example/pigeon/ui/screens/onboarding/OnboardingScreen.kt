@@ -74,10 +74,10 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Edit Identity",
+                text = "EDIT IDENTITY",
                 style = MaterialTheme.typography.titleLarge,
                 color = MeshColor.TextPrimary,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Black,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -193,16 +193,16 @@ fun MeshProfileHeader(displayName: String, role: String, gender: Gender, isVerif
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = role,
+                    text = role.uppercase(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MeshColor.TextSecondary,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Black
                 )
                 Text(
-                    text = "Gender: ${gender.name}",
+                    text = "GENDER: ${gender.name}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MeshColor.Primary.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Black
                 )
                 // Task 7.5: Conditional visibility for Verified Node badge
                 if (isVerified) {
@@ -254,7 +254,7 @@ fun MeshWarningBanner() {
                 text = "PROFILE LOCK",
                 style = MaterialTheme.typography.labelLarge,
                 color = MeshColor.TextPrimary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Black
             )
             Text(
                 text = "Identity changes are limited to once every 72 hours to maintain network trust during emergency operations.",
@@ -283,20 +283,20 @@ fun MeshSaveButton(
             .fillMaxWidth()
             .padding(16.dp)
             .background(MeshColor.Surface, RoundedCornerShape(16.dp))
-            .border(2.dp, MeshColor.Primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .border(2.dp, MeshColor.SuccessGreen.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(MeshColor.Primary.copy(alpha = 0.2f), CircleShape),
+                .background(MeshColor.SuccessGreen.copy(alpha = 0.2f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.CheckCircle, // Using generic icon as placeholder for 'emergency_home'
+                imageVector = Icons.Default.CheckCircle, 
                 contentDescription = null,
-                tint = MeshColor.Primary,
+                tint = MeshColor.SuccessGreen,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -326,20 +326,24 @@ fun MeshSaveButton(
                 .height(64.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MeshColor.Primary,
-                disabledContainerColor = MeshColor.Primary.copy(alpha = 0.5f)
+                containerColor = MeshColor.SuccessGreen,
+                disabledContainerColor = MeshColor.SuccessGreen.copy(alpha = 0.5f)
             ),
             enabled = enabled && !isLoading
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
             } else {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
                     color = Color.White,
-                    letterSpacing = 1.sp
+                    letterSpacing = 2.sp
                 )
             }
         }

@@ -1,46 +1,41 @@
-# PLAN.md — Task 8.4: Data Flow & Repository Sync (Refined)
+# PLAN: Task 8.5 - Visual Refinement
 
-## Objective
-Implement a reactive Navigation Drawer that serves as a global reflection of the user's "Tactical Identity". Changes made in the Profile screen must immediately synchronize with the Drawer Header across all sessions (Map, Radar, Log).
+This plan outlines the "Rugged" aesthetic overhaul for the Pigeon app, focusing on high-contrast, tactical, and functional styling as per the "Stich UI" standards.
 
 ## Proposed Changes
 
-### UI Layer — Navigation & Global State
-#### [MODIFY] [NavGraph.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/navigation/NavGraph.kt)
-- **Implement ModalNavigationDrawer**:
-    - Add `rememberDrawerState`.
-    - Wrap the main `Scaffold` in `ModalNavigationDrawer`.
-- **Create `MeshDrawerContent`**:
-    - A navigation drawer composable that collects the `userRepository.getUser()` flow.
-    - **Header**: Displays the large `IdentityAvatar`, `displayName`, and `nodeId` in a tactical card style.
-    - **Links**: Navigation items for Map, Radar, Log, and Profile.
+### [Theme & Styling]
+- **MeshTheme.kt**: 
+  - Ensure `MeshColor` aligns with Tactical Sand (#F8F7F6) and Operational Gold (#DF9C20).
+  - Explicitly use `MeshColor.TextPrimary` (#171511) for heavy borders.
 
-#### [MODIFY] [MapScreen.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/map/MapScreen.kt)
-- **Update `MeshHeader`**:
-    - Add an "Hamburger Menu" button to the left side.
-    - Keep the right side focused on **Mesh Status** (as requested).
-    - Clicking the menu button triggers `drawerState.open()`.
+### [Identity Components]
+- **IdentityComponents.kt**:
+  - **MeshRoleCard**: 
+    - Selected Border: `3.dp` width using `MeshColor.TextPrimary` for a high-contrast "Heavy Border".
+    - Font: Apply `fontFamily = FontFamily.Monospace` to the `role.title`.
+    - Shape: Standardize on `RoundedCornerShape(12.dp)` for cards.
+  - **MeshTextField**: Use `fontFamily = FontFamily.Monospace` for technical labels.
+  - **MeshAnonymousToggle**: Add a reactive **Privacy Alert** underneath when `isAnonymous` is toggled ON, using `MeshColor.AlertOrange`.
 
-#### [MODIFY] [IdentityComponents.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/components/IdentityComponents.kt)
-- **Implement `MeshDrawerHeader(user: User?)`**:
-    - A specialized version of the Profile header optimized for the side drawer width.
-    - Follows the "Stich UI" standards (12dp corners, Tactical Sand background).
+### [Map Screen]
+- **MapScreen.kt**:
+  - **LatLongPill**: Update coordinate text to use `fontFamily = FontFamily.Monospace`.
+  - **MeshHeader**: Update `MESH ACTIVE` and `SYNCED` labels to Monospace.
+  - **Report Button**: Ensure high-contrast `MeshColor.EmergencyRed` or a new `SafetyOrange`.
 
----
+### [Profile Screen]
+- **ProfileScreen.kt**:
+  - **ProfileHeader**: Apply Monospace to `user.nodeName`.
+  - **MeshStatisticsSection**: Ensure all technical values (Syncs, Trust rating) use Monospace.
+  - **Action Button**: Use `MeshColor.SuccessGreen` (Signal Green) for the final "SAVE & LOCK" button to differentiate it from "RETURN TO MAP".
 
 ## Verification Plan
 ### Automated Tests
-- `./gradlew assembleDebug` to verify the new drawer components compile and injection works.
+- N/A (UI-only refinement)
 
 ### Manual Verification
-1. **Drawer Identity Sync**:
-    - Open the side drawer on the Map screen. Observe name/avatar.
-    - Navigate to Profile via the bottom nav or drawer link.
-    - Update your **Display Name** and **Gender** (Avatar).
-    - Save and lock the identity.
-    - Open the side drawer immediately.
-    - **Expected**: The Drawer Header must reflect the new name and avatar without a manual refresh.
-2. **Global Access**:
-    - Verify the side drawer is accessible and synchronized on the **Radar** and **Log** screens.
-3. **Mesh Status Priority**:
-    - Verify that the Map Header correctly continues to show "Mesh Active" / "Synced" status independently of the drawer's identity display.
+- [ ] Audit Onboarding role cards for heavy borders and monospaced titles.
+- [ ] Verify `MapScreen` coordinates and status labels use monospaced fonts.
+- [ ] Confirm "Anonymous Mode" trigger provides a clear, high-contrast visual hint.
+- [ ] Verify Profile "Save & Lock" button uses the Signal Green aesthetic.
