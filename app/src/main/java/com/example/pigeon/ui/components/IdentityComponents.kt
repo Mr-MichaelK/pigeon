@@ -1,5 +1,7 @@
 package com.example.pigeon.ui.components
 
+import androidx.compose.foundation.Canvas
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -295,5 +297,44 @@ fun MeshTextField(
                 readOnly = readOnly
             )
         }
+    }
+}
+
+@Composable
+fun MeshDrawerHeader(user: com.example.pigeon.domain.model.User?) {
+    val displayName = if (user?.isAnonymous == true) {
+        "ANONYMOUS"
+    } else if (user?.displayName.isNullOrBlank()) {
+        "John Doe"
+    } else {
+        user?.displayName!!
+    }
+    
+    val nodeName = user?.nodeName ?: "GENERATING..."
+    val gender = user?.gender ?: Gender.UNDISCLOSED
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MeshColor.Surface)
+            .padding(24.dp)
+            .padding(top = 24.dp)
+    ) {
+        IdentityAvatar(gender = gender, size = 64.dp)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = displayName.uppercase(),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            color = MeshColor.TextPrimary,
+            letterSpacing = 1.sp
+        )
+        Text(
+            text = nodeName,
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            color = MeshColor.TextSecondary,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }

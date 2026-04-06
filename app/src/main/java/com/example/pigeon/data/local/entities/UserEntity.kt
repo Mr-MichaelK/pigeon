@@ -18,6 +18,8 @@ data class UserEntity(
     val gender: String = Gender.UNDISCLOSED.name,
     val nodeId: String = "",
     val isVerified: Boolean = false,
+    val totalSyncs: Int = 0,
+    val trustScore: Float = 100.0f,
     val lastUpdatedTimestamp: Long
 )
 
@@ -30,6 +32,8 @@ fun UserEntity.toDomain(): User = User(
     gender = try { Gender.valueOf(gender) } catch (e: Exception) { Gender.UNDISCLOSED },
     nodeId = nodeId,
     isVerified = isVerified,
+    totalSyncs = totalSyncs,
+    trustScore = trustScore,
     lastUpdatedTimestamp = lastUpdatedTimestamp
 )
 
@@ -42,5 +46,7 @@ fun User.toEntity(): UserEntity = UserEntity(
     gender = gender.name,
     nodeId = nodeId,
     isVerified = isVerified,
+    totalSyncs = totalSyncs,
+    trustScore = trustScore,
     lastUpdatedTimestamp = lastUpdatedTimestamp
 )

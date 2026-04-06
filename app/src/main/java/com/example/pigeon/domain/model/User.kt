@@ -16,5 +16,7 @@ data class User(
     val gender: Gender = Gender.UNDISCLOSED,
     val nodeId: String = "",
     val isVerified: Boolean = false,
+    val totalSyncs: Int = 0,
+    val trustScore: Float = 100.0f,
     val lastUpdatedTimestamp: Long
 )

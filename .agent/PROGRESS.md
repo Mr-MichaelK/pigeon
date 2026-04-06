@@ -203,16 +203,16 @@
 - [x] **Reviewer:** Verify that the "Anonymous Mode" toggle remains accessible and provides the same "Privacy Hint" found in Onboarding.
 
 ### Task 8.3: Summary & Metadata Display
-- [] **Coder:** Add a "Mesh Statistics" section (Read-Only) showing:
+- [x] **Coder:** Add a "Mesh Statistics" section (Read-Only) showing:
     - Total Syncs: Count of successful Set Union exchanges.
     - Trust Score: The calculated Reputation percentage from Phase 6.
     - Operational Role: Displayed as a high-contrast "Tactical Badge" based on the selected role (Civilian, First Responder, Scout, Utility).
-- [] **Reviewer:** Audit the spacing and touch targets (min 48dp) to ensure the screen is navigable under stress (e.g., wearing gloves or in low light).
+- [x] **Reviewer:** Audit the spacing and touch targets (min 48dp) to ensure the screen is navigable under stress (e.g., wearing gloves or in low light).
 
 ### Task 8.4: Data Flow & Repository Sync
-- [] **Architect**: Ensure the ProfileViewModel is a single source of truth for both the Onboarding and Profile screens.
-- [] **Coder**: Implement a "Discard Changes" flow that reverts the UI state to the last saved Room DB entry if the user exits without locking.
-- [] **Reviewer**: Confirm that changing the Gender in the Profile screen instantly updates the Avatar across the entire app (Map markers, Sidecars, etc.).
+- [x] **Architect**: Ensure the ProfileViewModel is a single source of truth for both the Onboarding and Profile screens.
+- [x] **Coder**: Implement a reactive Navigation Drawer that broadcasts identity updates across all screens (Map, Radar, Log).
+- [x] **Reviewer**: Confirm that changing the Gender/Name in Profile instantly updates the Drawer Header across the entire app.
 
 ### Task 8.5: Visual Refinement
 - [] **Coder**: Apply the "Rugged" styling: Use monospaced fonts for technical IDs, heavy borders for the role-selection cards, and high-contrast "Safety Orange" or "Signal Green" for active buttons.

@@ -72,6 +72,9 @@ fun ProfileScreen(
                 if (uiState.isLocked) {
                     IdentityDetails(user)
                     
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MeshStatisticsSection(user)
+                    
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = onBack,
@@ -125,8 +128,7 @@ fun ProfileScreen(
                         onAnonymousToggle = viewModel::onAnonymousToggle,
                         onGenderChange = viewModel::onGenderChange,
                         onVerifiedToggle = viewModel::onVerifiedToggle,
-                        onSave = viewModel::onSaveClick
-                    )
+                        onSave = viewModel::onSaveClick)
                 }
             }
         }
@@ -253,7 +255,7 @@ fun IdentityDetails(user: User) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "CURRENT TACTICAL ROLE",
+            text = "CURRENT ROLE",
             style = MaterialTheme.typography.labelMedium,
             color = MeshColor.TextPrimary,
             fontWeight = FontWeight.Bold,
@@ -502,6 +504,90 @@ private fun Modifier.bottomBorder(bottom: androidx.compose.ui.unit.Dp, color: Co
         end = androidx.compose.ui.geometry.Offset(size.width, y),
         strokeWidth = strokeWidth
     )
+}
+
+@Composable
+fun MeshStatisticsSection(user: com.example.pigeon.domain.model.User) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MeshColor.Surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MeshColor.Border, RoundedCornerShape(12.dp))
+            .padding(24.dp)
+    ) {
+        Text(
+            text = "MESH STATISTICS",
+            style = MaterialTheme.typography.labelMedium,
+            color = MeshColor.TextSecondary,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        MeshStatRow(
+            label = "OPERATIONAL STATUS",
+            value = { TacticalRoleBadge(user.role) }
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        MeshStatRow(
+            label = "NETWORK UPTIME / SYNCS",
+            value = { 
+                Text(
+                    text = "${user.totalSyncs} SUCCESSFUL EXCHANGES",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MeshColor.TextPrimary
+                )
+            }
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        MeshStatRow(
+            label = "TRUST RATING",
+            value = {
+                Text(
+                    text = "${user.trustScore.toInt()}% OPERATIONAL INTEGRITY",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (user.trustScore >= 80) MeshColor.SuccessGreen else MeshColor.Primary
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun MeshStatRow(label: String, value: @Composable () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MeshColor.TextSecondary,
+            fontSize = 10.sp
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        value()
+    }
+}
+
+@Composable
+fun TacticalRoleBadge(role: String) {
+    Surface(
+        color = MeshColor.Primary,
+        shape = RoundedCornerShape(4.dp)
+    ) {
+        Text(
+            text = role.uppercase(),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = MeshColor.TextPrimary,
+            fontWeight = FontWeight.ExtraBold
+        )
+    }
 }
 
 @Composable

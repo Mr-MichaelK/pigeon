@@ -12,5 +12,7 @@ interface UserRepository {
     suspend fun isProfileLocked(): Boolean
     suspend fun debugResetTimer()
     suspend fun debugLockProfile()
+    suspend fun incrementSyncCount()
+    suspend fun updateTrustScore(score: Float)
     suspend fun getOrGenerateNodeName(): String
 }

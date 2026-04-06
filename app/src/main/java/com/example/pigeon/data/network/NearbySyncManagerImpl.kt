@@ -10,9 +10,9 @@ import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
 import com.example.pigeon.domain.network.ConnectionStatus
 import com.example.pigeon.domain.network.NearbySyncManager
-import com.example.pigeon.domain.repository.EventRepository
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
+import com.example.pigeon.domain.repository.UserRepository
 import com.example.pigeon.proto.PigeonEvent
 import com.example.pigeon.proto.PigeonPayload
 import com.example.pigeon.proto.SyncItem
@@ -50,8 +50,9 @@ import javax.inject.Singleton
 @Singleton
 class NearbySyncManagerImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val eventRepository: EventRepository,
-    private val verificationDao: VerificationDao
+    private val eventRepository: com.example.pigeon.domain.repository.EventRepository,
+    private val verificationDao: VerificationDao,
+    private val userRepository: UserRepository
 ) : NearbySyncManager {
 
     private val TAG = "[MESH_RADIO]"
@@ -385,6 +386,10 @@ class NearbySyncManagerImpl @Inject constructor(
                 }
             } else {
                 connectionsClient.disconnectFromEndpoint(endpointId)
+                // Task 8.3: Increment global sync count on successful exchange
+                syncScope.launch {
+                    userRepository.incrementSyncCount()
+                }
             }
             syncStates.remove(endpointId)
         }

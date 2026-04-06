@@ -74,6 +74,14 @@ class LocalUserRepository @Inject constructor(
         userDao.upsertUser(user.copy(lastUpdatedTimestamp = System.currentTimeMillis()))
     }
 
+    override suspend fun incrementSyncCount() {
+        userDao.incrementSyncCount()
+    }
+
+    override suspend fun updateTrustScore(score: Float) {
+        userDao.updateTrustScore(score)
+    }
+
     override suspend fun getOrGenerateNodeName(): String {
         val existing = userDao.getUserSync()
         return if (existing?.nodeName.isNullOrEmpty()) {

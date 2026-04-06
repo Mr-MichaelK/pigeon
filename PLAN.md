@@ -1,42 +1,46 @@
-# PLAN.md — Task 8.2: Identity Lock & Edit Logic
+# PLAN.md — Task 8.4: Data Flow & Repository Sync (Refined)
 
 ## Objective
-Implement a formal confirmation flow for identity changes and polish the "Dual-State" form behavior to ensure users are fully aware of the 72-hour lockout before committing changes.
+Implement a reactive Navigation Drawer that serves as a global reflection of the user's "Tactical Identity". Changes made in the Profile screen must immediately synchronize with the Drawer Header across all sessions (Map, Radar, Log).
 
 ## Proposed Changes
 
-### UI State Management
-#### [MODIFY] [ProfileViewModel.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/profile/ProfileViewModel.kt)
-- Add `showSaveConfirmation: Boolean` to `ProfileUiState`.
-- Add `onSaveClick()` function to trigger the confirmation dialog.
-- Update `saveAndLockIdentity()` to dismiss the dialog and execute the save.
+### UI Layer — Navigation & Global State
+#### [MODIFY] [NavGraph.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/navigation/NavGraph.kt)
+- **Implement ModalNavigationDrawer**:
+    - Add `rememberDrawerState`.
+    - Wrap the main `Scaffold` in `ModalNavigationDrawer`.
+- **Create `MeshDrawerContent`**:
+    - A navigation drawer composable that collects the `userRepository.getUser()` flow.
+    - **Header**: Displays the large `IdentityAvatar`, `displayName`, and `nodeId` in a tactical card style.
+    - **Links**: Navigation items for Map, Radar, Log, and Profile.
 
-### UI Components
-#### [MODIFY] [ProfileScreen.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/profile/ProfileScreen.kt)
-- **Implement `SaveIdentityConfirmationDialog`**:
-    - Use `AlertDialog` with the "Rugged" aesthetic.
-    - **Title**: "CONFIRM IDENTITY BROADCAST"
-    - **Message**: "Your identity will be broadcast to the mesh and LOCKED for 72 hours. You will not be able to change your role or name during this period. Proceed?"
-    - **Confirm Button**: "BROADCAST & LOCK" (Gold)
-    - **Dismiss Button**: "CANCEL" (outlined)
-- **Update `ProfileScreen`**:
-    - Display the dialog when `uiState.showSaveConfirmation` is true.
-- **Polish `CountdownCard`**:
-    - Ensure it is visually distinct and prominent when the profile is locked.
+#### [MODIFY] [MapScreen.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/map/MapScreen.kt)
+- **Update `MeshHeader`**:
+    - Add an "Hamburger Menu" button to the left side.
+    - Keep the right side focused on **Mesh Status** (as requested).
+    - Clicking the menu button triggers `drawerState.open()`.
+
+#### [MODIFY] [IdentityComponents.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/components/IdentityComponents.kt)
+- **Implement `MeshDrawerHeader(user: User?)`**:
+    - A specialized version of the Profile header optimized for the side drawer width.
+    - Follows the "Stich UI" standards (12dp corners, Tactical Sand background).
 
 ---
 
 ## Verification Plan
 ### Automated Tests
-- `./gradlew assembleDebug` to ensure no UI regressions.
+- `./gradlew assembleDebug` to verify the new drawer components compile and injection works.
 
 ### Manual Verification
-1. **Confirmation Flow**:
-    - Unlock the profile using the debug button.
-    - Edit a field (e.g., change Role).
-    - Click "SAVE & LOCK IDENTITY".
-    - Verify the **Confirmation Dialog** appears with the correct warning text.
-    - Click "CANCEL" and verify no changes are saved.
-    - Click "BROADCAST & LOCK" and verify the profile locks and the countdown starts.
-2. **Dual-State Persistence**:
-    - Restart the app while the profile is locked. Verify the read-only "Identity Card" view is still shown.
+1. **Drawer Identity Sync**:
+    - Open the side drawer on the Map screen. Observe name/avatar.
+    - Navigate to Profile via the bottom nav or drawer link.
+    - Update your **Display Name** and **Gender** (Avatar).
+    - Save and lock the identity.
+    - Open the side drawer immediately.
+    - **Expected**: The Drawer Header must reflect the new name and avatar without a manual refresh.
+2. **Global Access**:
+    - Verify the side drawer is accessible and synchronized on the **Radar** and **Log** screens.
+3. **Mesh Status Priority**:
+    - Verify that the Map Header correctly continues to show "Mesh Active" / "Synced" status independently of the drawer's identity display.

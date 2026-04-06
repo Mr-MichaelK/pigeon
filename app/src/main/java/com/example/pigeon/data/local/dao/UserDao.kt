@@ -18,6 +18,12 @@ interface UserDao {
     @Upsert
     suspend fun upsertUser(user: UserEntity)
 
+    @Query("UPDATE user_profile SET totalSyncs = totalSyncs + 1 WHERE id = 1")
+    suspend fun incrementSyncCount()
+
+    @Query("UPDATE user_profile SET trustScore = :score WHERE id = 1")
+    suspend fun updateTrustScore(score: Float)
+
     @Query("DELETE FROM user_profile")
     suspend fun clearUser()
 }

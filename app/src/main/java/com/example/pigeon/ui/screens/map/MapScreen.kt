@@ -56,6 +56,7 @@ import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.style.layers.Property
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import java.io.File
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -75,7 +76,8 @@ import kotlinx.coroutines.awaitCancellation
 fun MapScreen(
     viewModel: MapViewModel = hiltViewModel(),
     reportViewModel: ReportViewModel = hiltViewModel(),
-    detailViewModel: EventDetailViewModel = hiltViewModel()
+    detailViewModel: EventDetailViewModel = hiltViewModel(),
+    onOpenDrawer: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val detailTrustScore by detailViewModel.trustScore.collectAsStateWithLifecycle()
@@ -294,7 +296,7 @@ fun MapScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Sticky Header: Mesh Status
-        MeshHeader()
+        MeshHeader(onOpenDrawer = onOpenDrawer)
 
         Box(modifier = Modifier.weight(1f)) {
             AndroidView(
@@ -414,7 +416,7 @@ fun MapScreen(
 }
 
 @Composable
-fun MeshHeader() {
+fun MeshHeader(onOpenDrawer: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -425,83 +427,99 @@ fun MeshHeader() {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Pulse Icon
-                Box(contentAlignment = Alignment.Center) {
-                    val infiniteTransition = rememberInfiniteTransition()
-                    val pulseAlpha by infiniteTransition.animateFloat(
-                        initialValue = 1f,
-                        targetValue = 0.2f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1500, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
+            IconButton(onClick = onOpenDrawer) {
+                Icon(
+                    imageVector = Icons.Outlined.Menu,
+                    contentDescription = "Open Drawer",
+                    tint = MeshColor.TextPrimary
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Row(
+                modifier = Modifier
+                    .weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Pulse Icon
+                    Box(contentAlignment = Alignment.Center) {
+                        val infiniteTransition = rememberInfiniteTransition()
+                        val pulseAlpha by infiniteTransition.animateFloat(
+                            initialValue = 1f,
+                            targetValue = 0.2f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1500, easing = LinearEasing),
+                                repeatMode = RepeatMode.Reverse
+                            )
                         )
-                    )
-                    
-                    Surface(
-                        modifier = Modifier.size(40.dp),
-                        shape = CircleShape,
-                        color = MeshColor.Primary.copy(alpha = 0.1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.WifiTethering,
-                            contentDescription = "Mesh Active",
-                            tint = MeshColor.MeshBlue,
-                            modifier = Modifier.padding(8.dp)
+                        
+                        Surface(
+                            modifier = Modifier.size(40.dp),
+                            shape = CircleShape,
+                            color = MeshColor.Primary.copy(alpha = 0.1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.WifiTethering,
+                                contentDescription = "Mesh Active",
+                                tint = MeshColor.MeshBlue,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                        
+                        // Status dot
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .align(Alignment.TopEnd)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4ADE80).copy(alpha = pulseAlpha))
+                                .border(1.5.dp, MeshColor.Surface, CircleShape)
                         )
                     }
                     
-                    // Status dot
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .align(Alignment.TopEnd)
-                            .clip(CircleShape)
-                            .background(Color(0xFF4ADE80).copy(alpha = pulseAlpha)) // Green 400
-                            .border(1.5.dp, MeshColor.Surface, CircleShape)
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column {
+                        Text(
+                            "MESH ACTIVE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MeshColor.TextPrimary,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            "Connected • Low Latency",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MeshColor.TextSecondary
+                        )
+                    }
                 }
                 
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        "MESH ACTIVE",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MeshColor.TextPrimary,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        "Connected • Low Latency",
+                        "2m ago",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MeshColor.TextSecondary
+                        fontWeight = FontWeight.Bold,
+                        color = MeshColor.TextPrimary
                     )
-                }
-            }
-            
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    "2m ago",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MeshColor.TextPrimary
-                )
-                Text(
-                    "SYNCED",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MeshColor.TextSecondary,
-                    letterSpacing = 1.sp
+                    Text(
+                        "SYNCED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeshColor.TextSecondary,
+                        letterSpacing = 1.sp
                 )
             }
         }
     }
+}
 }
 
 @Composable
@@ -942,7 +960,7 @@ fun MapCrosshair(modifier: Modifier = Modifier) {
     }
 }
 
-private fun Color.toArgb(): Int = (value shr 32).toInt()
+// Use standard Compose toArgb() instead of custom extension
 
 /**
  * Retrieves the absolute path to the offline map file, copying it from assets if needed.
