@@ -2,6 +2,7 @@ package com.example.pigeon.data.local.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.domain.model.User
 
 /**
@@ -14,6 +15,9 @@ data class UserEntity(
     val role: String,
     val nodeName: String,
     val isAnonymous: Boolean,
+    val gender: String = Gender.UNDISCLOSED.name,
+    val nodeId: String = "",
+    val isVerified: Boolean = false,
     val lastUpdatedTimestamp: Long
 )
 
@@ -23,6 +27,9 @@ fun UserEntity.toDomain(): User = User(
     role = role,
     nodeName = nodeName,
     isAnonymous = isAnonymous,
+    gender = try { Gender.valueOf(gender) } catch (e: Exception) { Gender.UNDISCLOSED },
+    nodeId = nodeId,
+    isVerified = isVerified,
     lastUpdatedTimestamp = lastUpdatedTimestamp
 )
 
@@ -32,5 +39,8 @@ fun User.toEntity(): UserEntity = UserEntity(
     role = role,
     nodeName = nodeName,
     isAnonymous = isAnonymous,
+    gender = gender.name,
+    nodeId = nodeId,
+    isVerified = isVerified,
     lastUpdatedTimestamp = lastUpdatedTimestamp
 )

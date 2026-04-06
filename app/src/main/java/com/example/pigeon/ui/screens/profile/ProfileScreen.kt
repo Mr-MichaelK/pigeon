@@ -104,6 +104,8 @@ fun ProfileScreen(
                         uiState = uiState,
                         onRoleChange = viewModel::onRoleChange,
                         onAnonymousToggle = viewModel::onAnonymousToggle,
+                        onGenderChange = viewModel::onGenderChange,
+                        onVerifiedToggle = viewModel::onVerifiedToggle,
                         onSave = viewModel::saveAndLockIdentity
                     )
                 }
@@ -132,19 +134,22 @@ fun ProfileHeader(user: User) {
             )
         }
         
-        // Verified Badge
-        Surface(
-            modifier = Modifier.size(32.dp),
-            shape = CircleShape,
-            color = MeshColor.Surface,
-            tonalElevation = 2.dp
-        ) {
-            Icon(
-                imageVector = Icons.Default.Verified,
-                contentDescription = "Verified",
-                tint = MeshColor.SuccessGreen,
-                modifier = Modifier.padding(2.dp)
-            )
+        
+        // Verified Badge (Task 7.5: Conditional visibility)
+        if (user.isVerified) {
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                color = MeshColor.Surface,
+                tonalElevation = 2.dp
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Verified,
+                    contentDescription = "Verified Member",
+                    tint = MeshColor.SuccessGreen,
+                    modifier = Modifier.padding(2.dp)
+                )
+            }
         }
     }
     
@@ -278,6 +283,8 @@ fun EditProfileView(
     uiState: ProfileUiState,
     onRoleChange: (String) -> Unit,
     onAnonymousToggle: (Boolean) -> Unit,
+    onGenderChange: (com.example.pigeon.domain.model.Gender) -> Unit,
+    onVerifiedToggle: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
     Column(
@@ -291,16 +298,72 @@ fun EditProfileView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        com.example.pigeon.ui.screens.onboarding.MeshGenderSelector(
+            selectedGender = uiState.editedGender,
+            onGenderSelected = onGenderChange
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         MeshProfileAnonymousToggle(
             isAnonymous = uiState.editedIsAnonymous,
             onToggle = onAnonymousToggle
         )
 
+        MeshProfileVerifiedToggle(
+            isVerified = uiState.editedIsVerified,
+            onToggle = onVerifiedToggle
+        )
+        
         Spacer(modifier = Modifier.height(32.dp))
-
+        
         MeshProfileSaveGroup(
             isSaving = uiState.isSaving,
             onSave = onSave
+        )
+    }
+}
+
+@Composable
+fun MeshProfileVerifiedToggle(
+    isVerified: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .background(MeshColor.Surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
+            .clickable { onToggle(!isVerified) }
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.VerifiedUser,
+                contentDescription = null,
+                tint = if (isVerified) MeshColor.SuccessGreen else MeshColor.TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "VERIFIED MESH MEMBER",
+                color = if (isVerified) MeshColor.SuccessGreen else MeshColor.TextPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Switch(
+            checked = isVerified,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MeshColor.SuccessGreen,
+                checkedTrackColor = MeshColor.SuccessGreen.copy(alpha = 0.5f),
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = MeshColor.Border
+            )
         )
     }
 }

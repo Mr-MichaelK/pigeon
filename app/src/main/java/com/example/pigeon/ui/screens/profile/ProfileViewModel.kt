@@ -2,6 +2,7 @@ package com.example.pigeon.ui.screens.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.domain.model.User
 import com.example.pigeon.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +21,9 @@ data class ProfileUiState(
     // Draft state for editing
     val editedRole: String = "",
     val editedIsAnonymous: Boolean = false,
+    val editedGender: Gender = Gender.UNDISCLOSED,
+    val editedIsVerified: Boolean = false,
+    val defaultAvatarName: String = "avatar_male",
     val isSaving: Boolean = false
 )
 
@@ -40,12 +44,19 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             userRepository.getUser().collect { user ->
                 val isLocked = userRepository.isProfileLocked()
+                
+                val currentGender = user?.gender ?: Gender.UNDISCLOSED
+                val defaultAvatarName = if (currentGender == Gender.FEMALE) "avatar_female" else "avatar_male"
+                
                 _uiState.update { 
                     it.copy(
                         user = user, 
                         // Initialize draft state if not already set or if user changed
                         editedRole = if (it.editedRole.isBlank()) user?.role ?: "Civilian" else it.editedRole,
                         editedIsAnonymous = user?.isAnonymous ?: false,
+                        editedGender = currentGender,
+                        editedIsVerified = user?.isVerified ?: false,
+                        defaultAvatarName = defaultAvatarName,
                         isLoading = false,
                         isLocked = isLocked,
                         canEdit = !isLocked
@@ -105,6 +116,14 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(editedIsAnonymous = isAnonymous) }
     }
 
+    fun onGenderChange(gender: Gender) {
+        _uiState.update { it.copy(editedGender = gender) }
+    }
+
+    fun onVerifiedToggle(isVerified: Boolean) {
+        _uiState.update { it.copy(editedIsVerified = isVerified) }
+    }
+
     fun saveAndLockIdentity() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
@@ -112,6 +131,8 @@ class ProfileViewModel @Inject constructor(
             val updatedUser = validUser.copy(
                 role = _uiState.value.editedRole,
                 isAnonymous = _uiState.value.editedIsAnonymous,
+                gender = _uiState.value.editedGender,
+                isVerified = _uiState.value.editedIsVerified,
                 lastUpdatedTimestamp = System.currentTimeMillis() // This locks it
             )
             userRepository.saveUser(updatedUser)

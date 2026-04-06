@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.ui.theme.MeshColor
 
 @Composable
@@ -60,8 +61,10 @@ fun OnboardingScreen(
         ) {
             // Profile Header
             MeshProfileHeader(
-                displayName = uiState.displayName.ifBlank { "Alpha-One" },
-                role = uiState.role
+                displayName = uiState.displayName.ifBlank { "John Doe" },
+                role = uiState.role,
+                gender = uiState.gender,
+                isVerified = uiState.isVerified
             )
 
             // Warning Banner
@@ -77,20 +80,47 @@ fun OnboardingScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Callsign Input
             MeshTextField(
                 value = uiState.displayName,
                 onValueChange = viewModel::onDisplayNameChange,
                 label = "Display Name",
-                placeholder = "e.g. Alpha-One"
+                placeholder = "e.g. John Doe"
             )
+
+            if (uiState.isAnonymous) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFB300).copy(alpha = 0.1f) // Amber/Yellow Rugged
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Your name will be hidden; you will appear as 'Anonymous Civilian' to the mesh",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFFFB300),
+                        modifier = Modifier.padding(8.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Role Selector
             MeshRoleSelector(
-                selectedRole = uiState.role,
+                selectedRoleId = uiState.role,
                 onRoleSelected = viewModel::onRoleChange
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Gender Selector
+            MeshGenderSelector(
+                selectedGender = uiState.gender,
+                onGenderSelected = viewModel::onGenderChange
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -106,7 +136,7 @@ fun OnboardingScreen(
             // Device Node Name (Visual only for now, as repo generates it)
             MeshTextField(
                 label = "Device Node Name",
-                value = "NODE-ALPHA-X", // Placeholder/Mock
+                value = uiState.nodeName,
                 onValueChange = {},
                 placeholder = "e.g. NODE-MESH-01",
                 readOnly = true
@@ -135,7 +165,7 @@ fun MeshTopBar(title: String) {
 }
 
 @Composable
-fun MeshProfileHeader(displayName: String, role: String) {
+fun MeshProfileHeader(displayName: String, role: String, gender: Gender, isVerified: Boolean) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -150,12 +180,20 @@ fun MeshProfileHeader(displayName: String, role: String) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar Placeholder
+            // Avatar Switching Logic (Task 7.1/7.4)
+            val avatarColor = when(gender) {
+                Gender.MALE -> Color(0xFFE0C09E)
+                Gender.FEMALE -> Color(0xFFF3E5F5)
+                Gender.UNDISCLOSED -> Color(0xFFE5E2DC)
+            }
+            
+            val avatarIcon = if (gender == Gender.FEMALE) Icons.Default.Person else Icons.Default.Person // Placeholder until actual assets
+
             Box(
                 modifier = Modifier
                     .size(96.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE0C09E)) // Close to the image placeholder color
+                    .background(avatarColor)
                     .border(2.dp, MeshColor.Primary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -177,25 +215,35 @@ fun MeshProfileHeader(displayName: String, role: String) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Role: $role",
+                    text = role,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MeshColor.TextSecondary
+                    color = MeshColor.TextSecondary,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.Verified,
-                        contentDescription = "Verified",
-                        tint = MeshColor.SuccessGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Verified Node",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MeshColor.SuccessGreen,
-                        fontWeight = FontWeight.Medium
-                    )
+                Text(
+                    text = "Gender: ${gender.name}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MeshColor.Primary.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Medium
+                )
+                // Task 7.5: Conditional visibility for Verified Node badge
+                if (isVerified) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.Verified,
+                            contentDescription = "Verified",
+                            tint = MeshColor.SuccessGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Verified Node",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MeshColor.SuccessGreen,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -296,11 +344,9 @@ fun MeshTextField(
 
 @Composable
 fun MeshRoleSelector(
-    selectedRole: String,
+    selectedRoleId: String,
     onRoleSelected: (String) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -311,54 +357,109 @@ fun MeshRoleSelector(
             style = MaterialTheme.typography.labelMedium,
             color = MeshColor.TextPrimary,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(bottom = 12.dp)
         )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(MeshColor.Surface, RoundedCornerShape(8.dp))
-                .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
-                .clickable { expanded = true }
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.CenterStart
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = selectedRole,
-                    color = MeshColor.TextPrimary,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = MeshColor.TextSecondary
-                )
-            }
-            
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(MeshColor.Surface)
-            ) {
-                TacticalRoles.forEach { role ->
-                    DropdownMenuItem(
-                        text = { Text(role.title, color = MeshColor.TextPrimary) },
-                        onClick = {
-                            onRoleSelected(role.id)
-                            expanded = false
-                        }
+            TacticalRoles.forEach { role ->
+                val isSelected = selectedRoleId == role.id
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(100.dp)
+                        .clickable { onRoleSelected(role.id) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) MeshColor.Primary.copy(alpha = 0.1f) else MeshColor.Surface
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) MeshColor.Primary else MeshColor.Border
                     )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = role.title.uppercase(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isSelected) MeshColor.Primary else MeshColor.TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = role.description,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MeshColor.TextSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 12.sp
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+@Composable
+fun MeshGenderSelector(
+    selectedGender: Gender,
+    onGenderSelected: (Gender) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = "Gender Selection",
+            style = MaterialTheme.typography.labelMedium,
+            color = MeshColor.TextPrimary,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(MeshColor.Surface, RoundedCornerShape(8.dp))
+                .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Gender.values().forEachIndexed { index, gender ->
+                val isSelected = selectedGender == gender
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(if (isSelected) MeshColor.Primary.copy(alpha = 0.2f) else Color.Transparent)
+                        .clickable { onGenderSelected(gender) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = gender.name,
+                        color = if (isSelected) MeshColor.Primary else MeshColor.TextSecondary,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
+                
+                if (index < Gender.values().size - 1) {
+                    Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(MeshColor.Border))
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun MeshAnonymousToggle(
@@ -448,23 +549,6 @@ fun MeshSaveButton(
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Box(
-            modifier = Modifier
-                .background(MeshColor.Background, RoundedCornerShape(50))
-                .border(1.dp, MeshColor.Border, RoundedCornerShape(50))
-                .padding(vertical = 8.dp, horizontal = 16.dp)
-        ) {
-            Text(
-                text = "71:59:58",
-                style = MaterialTheme.typography.titleMedium,
-                color = MeshColor.Primary,
-                fontWeight = FontWeight.Bold,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-            )
-        }
         
         Spacer(modifier = Modifier.height(16.dp))
         

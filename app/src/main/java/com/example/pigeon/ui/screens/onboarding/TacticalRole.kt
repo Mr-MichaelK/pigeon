@@ -12,7 +12,5 @@ data class TacticalRole(
 
 val TacticalRoles = listOf(
     TacticalRole("Civilian", "Civilian", "Basic node. Best for receiving alerts."),
-    TacticalRole("Scout", "Scout", "Mobile node. Focused on active field reporting."),
-    TacticalRole("Medic", "First Responder", "Medical support. Notified of injury reports."),
-    TacticalRole("Coordinator", "Coordinator", "Strategic node. Managing regional data.")
+    TacticalRole("Responder", "First Responder", "Medical and support. Notified of emergency reports.")
 )

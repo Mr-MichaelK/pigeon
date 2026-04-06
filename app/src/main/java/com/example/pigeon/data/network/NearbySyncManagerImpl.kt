@@ -410,6 +410,7 @@ class NearbySyncManagerImpl @Inject constructor(
             .setTimestamp(event.timestamp)
             .setCreatorDeviceId(event.creatorDeviceId)
             .setIsResolved(event.isResolved)
+            .setCreatorName(event.creatorName) // Note: Anonymization should be handled by the caller/ViewModel if specific to local user
             .build()
     }
 
@@ -433,7 +434,8 @@ class NearbySyncManagerImpl @Inject constructor(
             longitude = proto.longitude,
             timestamp = proto.timestamp,
             isResolved = proto.isResolved,
-            ttl = 0L
+            creatorName = proto.creatorName,
+            ttl = 3600000 // Default 1H for synced events
         )
     }
 

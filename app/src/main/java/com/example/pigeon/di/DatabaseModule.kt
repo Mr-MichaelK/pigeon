@@ -29,7 +29,13 @@ object DatabaseModule {
             PigeonDatabase::class.java,
             "pigeon_ledger.db"
         )
-        .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+        .addMigrations(
+            MIGRATION_2_3, 
+            MIGRATION_3_4, 
+            com.example.pigeon.data.local.MIGRATION_4_5,
+            com.example.pigeon.data.local.MIGRATION_5_6,
+            com.example.pigeon.data.local.MIGRATION_6_7
+        )
         .build()
     }
 

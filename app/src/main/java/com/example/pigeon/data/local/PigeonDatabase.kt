@@ -44,9 +44,28 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE `user_profile` ADD COLUMN `gender` TEXT NOT NULL DEFAULT 'UNDISCLOSED'")
+        database.execSQL("ALTER TABLE `user_profile` ADD COLUMN `nodeId` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE `events` ADD COLUMN `creatorName` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE `user_profile` ADD COLUMN `isVerified` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [UserEntity::class, EventEntity::class, VerificationEntity::class],
-    version = 4,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)

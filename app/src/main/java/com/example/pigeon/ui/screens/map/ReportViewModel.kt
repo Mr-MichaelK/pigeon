@@ -8,7 +8,9 @@ import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.network.NearbySyncManager
 import com.example.pigeon.domain.repository.EventRepository
 import com.example.pigeon.proto.PigeonEvent
+import com.example.pigeon.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -16,6 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ReportViewModel @Inject constructor(
     private val eventRepository: EventRepository,
+    private val userRepository: UserRepository,
     private val nearbySyncManager: NearbySyncManager
 ) : ViewModel() {
 
@@ -28,10 +31,11 @@ class ReportViewModel @Inject constructor(
         longitude: Double
     ) {
         viewModelScope.launch {
+            val user = userRepository.getUser().first()
             val eventId = UUID.randomUUID().toString()
             val event = Event(
                 eventId = eventId,
-                creatorDeviceId = "LOCAL-NODE", // Placeholder for local identity
+                creatorDeviceId = user?.nodeId ?: "UNKNOWN-NODE",
                 eventType = eventType,
                 title = title,
                 description = description,
@@ -39,6 +43,7 @@ class ReportViewModel @Inject constructor(
                 longitude = longitude,
                 timestamp = System.currentTimeMillis(),
                 isResolved = false,
+                creatorName = user?.displayName ?: "Unknown",
                 ttl = ttlMillis
             )
             
@@ -52,12 +57,13 @@ class ReportViewModel @Inject constructor(
             nearbySyncManager.startProximityWave()
 
             // 4. Broadcast to nearby peers immediately
-            val protoEvent = domainToProto(event)
+            val isAnonymous = user?.isAnonymous ?: false
+            val protoEvent = domainToProto(event, isAnonymous)
             nearbySyncManager.broadcastIncident(protoEvent)
         }
     }
 
-    private fun domainToProto(event: Event): PigeonEvent {
+    private fun domainToProto(event: Event, isAnonymous: Boolean = false): PigeonEvent {
         val protoType = when (event.eventType) {
             EventType.FIRE -> com.example.pigeon.proto.EventType.FIRE
             EventType.MEDICAL -> com.example.pigeon.proto.EventType.MEDICAL
@@ -75,6 +81,7 @@ class ReportViewModel @Inject constructor(
             .setTimestamp(event.timestamp)
             .setCreatorDeviceId(event.creatorDeviceId)
             .setIsResolved(event.isResolved)
+            .setCreatorName(if (isAnonymous) "Anonymous Civilian" else event.creatorName)
             .build()
     }
 }

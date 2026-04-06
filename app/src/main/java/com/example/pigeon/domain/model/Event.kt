@@ -17,6 +17,7 @@ data class Event(
     val longitude: Double,
     val timestamp: Long,
     val isResolved: Boolean,
+    val creatorName: String,
     val ttl: Long
 ) {
     /**

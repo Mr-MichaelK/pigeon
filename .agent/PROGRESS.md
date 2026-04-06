@@ -163,3 +163,29 @@
 *   **Mesh Propagation**: Integrated `VerificationMessage` into the P2P protocol, enabling real-time trust synchronization across all connected nodes.
 *   **Reactive Pins**: Updated MapLibre symbol management to visually distinguish between unverified (40% alpha) and verified (100% alpha) incident markers, improving situational awareness.
 
+## 🟡 PHASE 7: Onboarding & Identity Refinement (IN PROGRESS)
+### Task 7.1: Expanded Identity Schema (Gender & Logic)
+- [x] **Architect:** Update the UserProfile Room Entity to include gender (Enum: MALE, FEMALE, UNDISCLOSED) and nodeId (UUID).
+- [x] **Coder:** Implement a ProfileViewModel logic that reactively switches the default avatar: if gender == MALE set to avatar_male, else avatar_female. Default to avatar_male for UNDISCLOSED.
+- [x] **Reviewer:** Verify that the 72-hour lock correctly prevents gender/name flipping after the initial "Join Mesh" action.
+
+### Task 7.2: UX/UI Cleanup & Placeholder Polish
+- [x] **Coder:** Replace the "Alpha One" placeholder in the Display Name field with a context-neutral hint (e.g., "John Doe").
+- [x] **Coder:** Remove the fixed, non-functional countdown timer from the Onboarding screen to reduce visual clutter for first-time users.
+- [x] **Reviewer:** Audit the "Rugged/Utility" high-contrast colors for the new Gender selection radio-group/tabs.
+
+### Task 7.3: Anonymous Mode & Privacy Indicators
+- [x] **Architect:** Define the "Privacy Toggle" behavior—Anonymous mode should nullify the displayName in the broadcast payload but keep it in the local DB.
+- [x] **Coder:** Implement a dynamic "Privacy Hint" beneath the name input: "Your name will be hidden; you will appear as 'Anonymous Civilian' to the mesh" when toggled ON.
+- [x] **Reviewer:** Ensure the "Rugged" aesthetic is maintained—use a warning-style yellow/amber for the privacy indicator.
+
+### Task 7.4: Automated Node Identity
+- [x] **Architect:** Define the nodeId generation strategy: A unique, persistent String derived from a random UUID or Settings.Secure.ANDROID_ID.
+- [x] **Coder:** Implement the auto-generation logic so the "Device Node Name" field is populated on first boot and set to read-only in the UI.
+- [x] **Reviewer:** Confirm that the generated ID is short enough to be readable on the Radar and Peer List screens.
+
+### Task 7.5: Role Purge & Verification State
+- [x] **Architect:** Remove all references to the "Coordinator" role from the codebase, Enums, and UI layouts.
+- [x] **Coder:** Implement conditional visibility for the "Verified Node" badge: Visibility = GONE by default. It must only appear if the local isVerified flag is true (post-threshold syncs).
+- [x] **Coder:** Finalize the 4-Grid Role Selector: [Civilian, First Responder, Scout, Utility/Tech].
+- [x] **Reviewer:** Perform a full "Onboarding-to-Map" walkthrough to ensure the transition is seamless and the "Rugged" UI feels cohesive.
