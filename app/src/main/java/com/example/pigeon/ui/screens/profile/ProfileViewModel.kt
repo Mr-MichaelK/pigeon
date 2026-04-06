@@ -19,12 +19,14 @@ data class ProfileUiState(
     val isLocked: Boolean = false,
     val canEdit: Boolean = false,
     // Draft state for editing
+    val editedDisplayName: String = "",
     val editedRole: String = "",
     val editedIsAnonymous: Boolean = false,
     val editedGender: Gender = Gender.UNDISCLOSED,
     val editedIsVerified: Boolean = false,
     val defaultAvatarName: String = "avatar_male",
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val showSaveConfirmation: Boolean = false
 )
 
 @HiltViewModel
@@ -52,6 +54,7 @@ class ProfileViewModel @Inject constructor(
                     it.copy(
                         user = user, 
                         // Initialize draft state if not already set or if user changed
+                        editedDisplayName = if (it.editedDisplayName.isBlank()) user?.displayName ?: "" else it.editedDisplayName,
                         editedRole = if (it.editedRole.isBlank()) user?.role ?: "Civilian" else it.editedRole,
                         editedIsAnonymous = user?.isAnonymous ?: false,
                         editedGender = currentGender,
@@ -108,6 +111,10 @@ class ProfileViewModel @Inject constructor(
         return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
 
+    fun onDisplayNameChange(name: String) {
+        _uiState.update { it.copy(editedDisplayName = name) }
+    }
+
     fun onRoleChange(role: String) {
         _uiState.update { it.copy(editedRole = role) }
     }
@@ -124,11 +131,20 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(editedIsVerified = isVerified) }
     }
 
+    fun onSaveClick() {
+        _uiState.update { it.copy(showSaveConfirmation = true) }
+    }
+
+    fun dismissSaveConfirmation() {
+        _uiState.update { it.copy(showSaveConfirmation = false) }
+    }
+
     fun saveAndLockIdentity() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
+            _uiState.update { it.copy(showSaveConfirmation = false, isSaving = true) }
             val validUser = _uiState.value.user ?: return@launch
             val updatedUser = validUser.copy(
+                displayName = _uiState.value.editedDisplayName,
                 role = _uiState.value.editedRole,
                 isAnonymous = _uiState.value.editedIsAnonymous,
                 gender = _uiState.value.editedGender,
@@ -143,6 +159,12 @@ class ProfileViewModel @Inject constructor(
     fun debugResetTimer() {
         viewModelScope.launch {
             userRepository.debugResetTimer()
+        }
+    }
+
+    fun debugLockProfile() {
+        viewModelScope.launch {
+            userRepository.debugLockProfile()
         }
     }
 }

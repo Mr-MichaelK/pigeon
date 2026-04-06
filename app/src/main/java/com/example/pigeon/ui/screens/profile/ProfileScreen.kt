@@ -1,5 +1,6 @@
 package com.example.pigeon.ui.screens.profile
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,11 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.domain.model.User
+import com.example.pigeon.ui.components.*
 import com.example.pigeon.ui.theme.MeshColor
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun ProfileScreen(
@@ -89,28 +91,52 @@ fun ProfileScreen(
                         )
                     }
 
-                    TextButton(
-                        onClick = viewModel::debugResetTimer,
-                        modifier = Modifier.padding(top = 8.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "DEBUG: RESET 72H TIMER",
-                            color = MeshColor.Primary.copy(alpha = 0.5f),
-                            style = MaterialTheme.typography.labelSmall
-                        )
+                        TextButton(
+                            onClick = viewModel::debugResetTimer
+                        ) {
+                            Text(
+                                text = "DEBUG: UNLOCK",
+                                color = MeshColor.Primary.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        TextButton(
+                            onClick = viewModel::debugLockProfile
+                        ) {
+                            Text(
+                                text = "DEBUG: LOCK",
+                                color = MeshColor.EmergencyRed.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 } else {
                     EditProfileView(
                         uiState = uiState,
                         onRoleChange = viewModel::onRoleChange,
+                        onDisplayNameChange = viewModel::onDisplayNameChange,
                         onAnonymousToggle = viewModel::onAnonymousToggle,
                         onGenderChange = viewModel::onGenderChange,
                         onVerifiedToggle = viewModel::onVerifiedToggle,
-                        onSave = viewModel::saveAndLockIdentity
+                        onSave = viewModel::onSaveClick
                     )
                 }
             }
         }
+    }
+
+    if (uiState.showSaveConfirmation) {
+        SaveIdentityConfirmationDialog(
+            onConfirm = viewModel::saveAndLockIdentity,
+            onDismiss = viewModel::dismissSaveConfirmation
+        )
     }
 }
 
@@ -120,25 +146,14 @@ fun ProfileHeader(user: User) {
         modifier = Modifier.size(120.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            shape = CircleShape,
-            color = MeshColor.Background,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = "Avatar",
-                tint = Color.White,
-                modifier = Modifier.padding(24.dp)
-            )
-        }
-        
+        IdentityAvatar(gender = user.gender, size = 120.dp)
         
         // Verified Badge (Task 7.5: Conditional visibility)
         if (user.isVerified) {
             Surface(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier
+                    .size(32.dp)
+                    .align(Alignment.BottomEnd),
                 shape = CircleShape,
                 color = MeshColor.Surface,
                 tonalElevation = 2.dp
@@ -155,29 +170,36 @@ fun ProfileHeader(user: User) {
     
     Spacer(modifier = Modifier.height(16.dp))
     
-    Text(
-        text = user.displayName,
-        style = MaterialTheme.typography.headlineSmall,
-        color = MeshColor.TextPrimary,
-        fontWeight = FontWeight.Bold
-    )
-    
-    Text(
-        text = user.nodeName,
-        style = MaterialTheme.typography.bodySmall,
-        color = MeshColor.Primary,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 1.sp
-    )
+    // Display Name & Node ID (Task 8.1)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = user.displayName,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MeshColor.TextPrimary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = user.nodeName,
+            style = MaterialTheme.typography.labelLarge,
+            color = MeshColor.TextSecondary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
 }
 
 @Composable
 fun CountdownCard(countdownText: String, isLocked: Boolean) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MeshColor.Surface,
-        tonalElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border)
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isLocked) Modifier.border(2.dp, MeshColor.Primary.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                else Modifier
+            ),
+        color = if (isLocked) MeshColor.Surface else MeshColor.SuccessGreen.copy(alpha = 0.05f),
+        tonalElevation = 2.dp,
+        border = BorderStroke(1.dp, if (isLocked) MeshColor.Primary else MeshColor.SuccessGreen)
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -224,15 +246,38 @@ fun CountdownCard(countdownText: String, isLocked: Boolean) {
 
 @Composable
 fun IdentityDetails(user: User) {
+    val currentRole = TacticalRoles.find { it.id == user.role } ?: TacticalRoles.first()
+    
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MeshColor.Surface, RoundedCornerShape(12.dp))
-            .border(1.dp, MeshColor.Border, RoundedCornerShape(12.dp))
-            .padding(16.dp)
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        DetailRow(label = "TACTICAL ROLE", value = user.role.uppercase(), isLast = false)
-        DetailRow(label = "ANONYMOUS MODE", value = if (user.isAnonymous) "ENABLED" else "DISABLED", isLast = true)
+        Text(
+            text = "CURRENT TACTICAL ROLE",
+            style = MaterialTheme.typography.labelMedium,
+            color = MeshColor.TextPrimary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        
+        MeshRoleCard(
+            role = currentRole,
+            isSelected = true,
+            onClick = null,
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MeshColor.Surface, RoundedCornerShape(12.dp))
+                .border(1.dp, MeshColor.Border, RoundedCornerShape(12.dp))
+                .padding(16.dp)
+        ) {
+            DetailRow(label = "ANONYMOUS MODE", value = if (user.isAnonymous) "ENABLED" else "DISABLED", isLast = true)
+        }
     }
 }
 
@@ -281,31 +326,35 @@ fun DetailRow(label: String, value: String, isLast: Boolean) {
 @Composable
 fun EditProfileView(
     uiState: ProfileUiState,
+    onDisplayNameChange: (String) -> Unit,
     onRoleChange: (String) -> Unit,
     onAnonymousToggle: (Boolean) -> Unit,
-    onGenderChange: (com.example.pigeon.domain.model.Gender) -> Unit,
+    onGenderChange: (Gender) -> Unit,
     onVerifiedToggle: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        MeshProfileDropdown(
-            label = "OPERATIONAL ROLE",
-            currentRole = uiState.editedRole,
+        MeshTextField(
+            value = uiState.editedDisplayName,
+            onValueChange = onDisplayNameChange,
+            label = "DISPLAY NAME",
+            placeholder = "Enter your mesh identity..."
+        )
+
+        MeshRoleSelector(
+            selectedRoleId = uiState.editedRole,
             onRoleSelected = onRoleChange
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        com.example.pigeon.ui.screens.onboarding.MeshGenderSelector(
+        MeshGenderSelector(
             selectedGender = uiState.editedGender,
             onGenderSelected = onGenderChange
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        MeshProfileAnonymousToggle(
+        
+        MeshAnonymousToggle(
             isAnonymous = uiState.editedIsAnonymous,
             onToggle = onAnonymousToggle
         )
@@ -315,7 +364,7 @@ fun EditProfileView(
             onToggle = onVerifiedToggle
         )
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         MeshProfileSaveGroup(
             isSaving = uiState.isSaving,
@@ -349,7 +398,7 @@ fun MeshProfileVerifiedToggle(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "VERIFIED MESH MEMBER",
+                text = "VERIFIED MESH MEMBER [DEBUG]",
                 color = if (isVerified) MeshColor.SuccessGreen else MeshColor.TextPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold
@@ -361,109 +410,6 @@ fun MeshProfileVerifiedToggle(
             colors = SwitchDefaults.colors(
                 checkedThumbColor = MeshColor.SuccessGreen,
                 checkedTrackColor = MeshColor.SuccessGreen.copy(alpha = 0.5f),
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = MeshColor.Border
-            )
-        )
-    }
-}
-
-// --- Mesh Components (Duplicated/Adapted for Profile) ---
-
-@Composable
-fun MeshProfileDropdown(
-    label: String,
-    currentRole: String,
-    onRoleSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    // Hardcoded roles for now, same as Onboarding
-    val roles = listOf("Civilian", "Medic", "Logistics", "Scout", "Operator")
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MeshColor.TextPrimary,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(MeshColor.Surface, RoundedCornerShape(8.dp))
-                .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
-                .clickable { expanded = true }
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = currentRole.uppercase(),
-                    color = MeshColor.TextPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    tint = MeshColor.TextSecondary
-                )
-            }
-            
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(MeshColor.Surface)
-            ) {
-                listOf("Civilian", "Medic", "Rescue", "Utility").forEach { role ->
-                    DropdownMenuItem(
-                        text = { Text(role.uppercase(), color = MeshColor.TextPrimary) },
-                        onClick = {
-                            onRoleSelected(role)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-fun MeshProfileAnonymousToggle(
-    isAnonymous: Boolean,
-    onToggle: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(MeshColor.Surface, RoundedCornerShape(8.dp))
-            .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp))
-            .clickable { onToggle(!isAnonymous) }
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "ANONYMOUS MODE",
-            color = MeshColor.TextPrimary,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Switch(
-            checked = isAnonymous,
-            onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MeshColor.Primary,
-                checkedTrackColor = MeshColor.Primary.copy(alpha = 0.5f),
                 uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = MeshColor.Border
             )
@@ -510,7 +456,7 @@ fun MeshProfileSaveGroup(
             text = "Your identity will be locked for 72 hours after saving. Ensure all data is correct.",
             style = MaterialTheme.typography.bodySmall,
             color = MeshColor.TextSecondary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp)
         )
         
@@ -555,5 +501,47 @@ private fun Modifier.bottomBorder(bottom: androidx.compose.ui.unit.Dp, color: Co
         start = androidx.compose.ui.geometry.Offset(0f, y),
         end = androidx.compose.ui.geometry.Offset(size.width, y),
         strokeWidth = strokeWidth
+    )
+}
+
+@Composable
+fun SaveIdentityConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "CONFIRM IDENTITY BROADCAST",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MeshColor.TextPrimary
+            )
+        },
+        text = {
+            Text(
+                text = "Your identity will be broadcast to the mesh and LOCKED for 72 hours. You will not be able to change your role or name during this period. Proceed?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MeshColor.TextSecondary
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = MeshColor.Primary),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("BROADCAST & LOCK", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", color = MeshColor.TextSecondary)
+            }
+        },
+        containerColor = MeshColor.Surface,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 8.dp
     )
 }

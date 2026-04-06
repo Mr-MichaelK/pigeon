@@ -68,6 +68,12 @@ class LocalUserRepository @Inject constructor(
         userDao.upsertUser(user.copy(lastUpdatedTimestamp = seventyThreeHoursAgo))
     }
 
+    override suspend fun debugLockProfile() {
+        val user = userDao.getUserSync() ?: return
+        // Set timestamp to now to ensure it's locked
+        userDao.upsertUser(user.copy(lastUpdatedTimestamp = System.currentTimeMillis()))
+    }
+
     override suspend fun getOrGenerateNodeName(): String {
         val existing = userDao.getUserSync()
         return if (existing?.nodeName.isNullOrEmpty()) {

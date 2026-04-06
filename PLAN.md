@@ -1,55 +1,42 @@
-# PLAN.md — Task 7.5: Role Purge & Verification State
+# PLAN.md — Task 8.2: Identity Lock & Edit Logic
 
 ## Objective
-Clean up the role system by removing the "Coordinator" role and implementing a 4-grid role selector. Additionally, introduce a "Verified Mesh Member" state with a toggle in the Profile screen and conditional trust indicators in the UI.
+Implement a formal confirmation flow for identity changes and polish the "Dual-State" form behavior to ensure users are fully aware of the 72-hour lockout before committing changes.
 
 ## Proposed Changes
 
-### Data Layer & Schema
-#### [MODIFY] [User.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/domain/model/User.kt)
-- Add `val isVerified: Boolean = false` to the `User` data class.
-
-#### [MODIFY] [UserEntity.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/data/local/entities/UserEntity.kt)
-- Add `val isVerified: Boolean = false` to the `UserEntity`.
-- Update `toDomain()` and `toEntity()` mappers.
-
-#### [MODIFY] [PigeonDatabase.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/data/local/PigeonDatabase.kt)
-- Increment version to `7`.
-- Add `MIGRATION_6_7` to add the `isVerified` column to `user_profile`.
-
-### Business Logic
-#### [MODIFY] [TacticalRole.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/onboarding/TacticalRole.kt)
-- Remove `Coordinator` and `Scout` roles.
-- Ensure the list consists of only: `Civilian`, `First Responder`.
-
+### UI State Management
 #### [MODIFY] [ProfileViewModel.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/profile/ProfileViewModel.kt)
-- Add `onVerifiedToggle(Boolean)` to the view model state and logic.
-- Ensure `isVerified` is saved/loaded correctly.
+- Add `showSaveConfirmation: Boolean` to `ProfileUiState`.
+- Add `onSaveClick()` function to trigger the confirmation dialog.
+- Update `saveAndLockIdentity()` to dismiss the dialog and execute the save.
 
-### UI Implementation
-#### [MODIFY] [OnboardingScreen.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/onboarding/OnboardingScreen.kt)
-- **MeshRoleSelector**: Replace the `DropdownMenu` with a `LazyVerticalGrid` (or a 2x2 custom grid) showing the 4 roles with icons/descriptions.
-- **MeshProfileHeader**: Make the "Verified Node" badge conditional on `isVerified`.
-
+### UI Components
 #### [MODIFY] [ProfileScreen.kt](file:///Users/michael/AndroidStudioProjects/Pigeon/app/src/main/java/com/example/pigeon/ui/screens/profile/ProfileScreen.kt)
-- Add a "VERIFIED MESH MEMBER" toggle in the `EditProfileView`.
-- Show the "Verified" badge in the `ProfileHeader` if the flag is true.
+- **Implement `SaveIdentityConfirmationDialog`**:
+    - Use `AlertDialog` with the "Rugged" aesthetic.
+    - **Title**: "CONFIRM IDENTITY BROADCAST"
+    - **Message**: "Your identity will be broadcast to the mesh and LOCKED for 72 hours. You will not be able to change your role or name during this period. Proceed?"
+    - **Confirm Button**: "BROADCAST & LOCK" (Gold)
+    - **Dismiss Button**: "CANCEL" (outlined)
+- **Update `ProfileScreen`**:
+    - Display the dialog when `uiState.showSaveConfirmation` is true.
+- **Polish `CountdownCard`**:
+    - Ensure it is visually distinct and prominent when the profile is locked.
 
 ---
 
 ## Verification Plan
 ### Automated Tests
-- `./gradlew assembleDebug` to verify compilation.
+- `./gradlew assembleDebug` to ensure no UI regressions.
 
 ### Manual Verification
-1. **Role Purge**:
-   - Open Onboarding/Profile.
-   - Verify "Coordinator" is nowhere to be found.
-   - Verify the 4 roles are: Civilian, First Responder, Scout, Utility/Tech.
-2. **4-Grid Selector**:
-   - Verify the role selector in Onboarding is now a grid instead of a dropdown.
-3. **Verification State**:
-   - Go to Profile -> Edit.
-   - Toggle "Verified Mesh Member" ON and Save.
-   - Verify the "Verified Node" badge appears in the Profile header and Onboarding summary (if accessible).
-   - Toggle OFF and verify the badge disappears.
+1. **Confirmation Flow**:
+    - Unlock the profile using the debug button.
+    - Edit a field (e.g., change Role).
+    - Click "SAVE & LOCK IDENTITY".
+    - Verify the **Confirmation Dialog** appears with the correct warning text.
+    - Click "CANCEL" and verify no changes are saved.
+    - Click "BROADCAST & LOCK" and verify the profile locks and the countdown starts.
+2. **Dual-State Persistence**:
+    - Restart the app while the profile is locked. Verify the read-only "Identity Card" view is still shown.

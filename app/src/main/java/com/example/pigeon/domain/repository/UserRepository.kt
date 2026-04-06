@@ -11,5 +11,6 @@ interface UserRepository {
     suspend fun saveUser(user: User)
     suspend fun isProfileLocked(): Boolean
     suspend fun debugResetTimer()
+    suspend fun debugLockProfile()
     suspend fun getOrGenerateNodeName(): String
 }

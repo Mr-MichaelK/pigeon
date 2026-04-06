@@ -189,3 +189,31 @@
 - [x] **Coder:** Implement conditional visibility for the "Verified Node" badge: Visibility = GONE by default. It must only appear if the local isVerified flag is true (post-threshold syncs).
 - [x] **Coder:** Finalize the 4-Grid Role Selector: [Civilian, First Responder, Scout, Utility/Tech].
 - [x] **Reviewer:** Perform a full "Onboarding-to-Map" walkthrough to ensure the transition is seamless and the "Rugged" UI feels cohesive.
+
+## 🔴 PHASE 8: Profile Screen Refinement (FUTURE)
+### Task 8.1: Unified "Tactical ID" Layout
+- [x] **Architect:** Design the Profile Screen to mirror the Onboarding UI's 2-card role selector and gender-based avatar system for visual consistency.
+- [x] **Coder:** Implement a Header Section featuring the large circular avatar (Auto-switched by Gender) and the nodeId (Device Name) as a permanent, non-editable subtitle.
+- [x] **Reviewer:** Ensure the "Verified Node" badge is only visible if the user's isVerified flag is true in the Room DB.
+
+### Task 8.2: Identity Lock & Edit Logic
+- [x] **Architect:** Implement the "Dual-State" form: Fields are Enabled only if the 72-hour lockout period has expired.
+- [x] **Coder:** Build the Countdown Timer Overlay for the Profile screen. If a lock is active, the "Edit" button is replaced by a live HH:MM:SS timer.
+- [x] **Coder:** Implement the "Save & Lock" confirmation modal. Clicking this must update the last_edit_timestamp in the UserProfile table.
+- [x] **Reviewer:** Verify that the "Anonymous Mode" toggle remains accessible and provides the same "Privacy Hint" found in Onboarding.
+
+### Task 8.3: Summary & Metadata Display
+- [] **Coder:** Add a "Mesh Statistics" section (Read-Only) showing:
+    - Total Syncs: Count of successful Set Union exchanges.
+    - Trust Score: The calculated Reputation percentage from Phase 6.
+    - Operational Role: Displayed as a high-contrast "Tactical Badge" based on the selected role (Civilian, First Responder, Scout, Utility).
+- [] **Reviewer:** Audit the spacing and touch targets (min 48dp) to ensure the screen is navigable under stress (e.g., wearing gloves or in low light).
+
+### Task 8.4: Data Flow & Repository Sync
+- [] **Architect**: Ensure the ProfileViewModel is a single source of truth for both the Onboarding and Profile screens.
+- [] **Coder**: Implement a "Discard Changes" flow that reverts the UI state to the last saved Room DB entry if the user exits without locking.
+- [] **Reviewer**: Confirm that changing the Gender in the Profile screen instantly updates the Avatar across the entire app (Map markers, Sidecars, etc.).
+
+### Task 8.5: Visual Refinement
+- [] **Coder**: Apply the "Rugged" styling: Use monospaced fonts for technical IDs, heavy borders for the role-selection cards, and high-contrast "Safety Orange" or "Signal Green" for active buttons.
+- [] **Reviewer**: Audit the "Anonymous Mode" visual indicator—ensure it is prominent enough that a user knows their identity is hidden before they broadcast a new report.
