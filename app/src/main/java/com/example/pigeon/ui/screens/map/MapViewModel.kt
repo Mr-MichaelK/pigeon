@@ -135,4 +135,9 @@ class MapViewModel @Inject constructor(
     fun onEventSelected(event: Event?) {
         _selectedEvent.value = event
     }
+
+    fun onEventSelectedById(eventId: String) {
+        val event = uiState.value.events.find { it.eventId == eventId }
+        _selectedEvent.value = event
+    }
 }

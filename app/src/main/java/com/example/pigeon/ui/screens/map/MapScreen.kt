@@ -69,6 +69,8 @@ import org.maplibre.android.style.layers.PropertyFactory.*
 import org.maplibre.android.location.engine.LocationEngineCallback
 import org.maplibre.android.location.engine.LocationEngineResult
 import org.maplibre.android.location.engine.LocationEngineRequest
+import com.google.gson.JsonPrimitive
+
 import kotlinx.coroutines.awaitCancellation
 
 
@@ -140,13 +142,13 @@ fun MapScreen(
                     val updatedStyleJson = styleJson.replace("mbtiles://lebanon_base.mbtiles", mbtilesUri)
                     Log.d("MAP_DEBUG", "🔄 Initializing with Permanent Offline Style: $mbtilesUri")
                     map.setStyle(Style.Builder().fromJson(updatedStyleJson)) { style: Style ->
-                        setupMapStyle(this@apply, map, style, context, uiState.events, uiState.trustScores, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
+                        setupMapStyle(this@apply, map, style, context, uiState.events, uiState.trustScores, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { id -> viewModel.onEventSelectedById(id) })
                     }
                 } catch (e: Exception) {
                     Log.e("MAP_DEBUG", "❌ Offline style loading failed: ${e.message}")
                     // Fallback to direct asset (might fail if MBTiles uri isn't replaced, but best we can do)
                     map.setStyle("asset://style-offline.json") { style: Style ->
-                        setupMapStyle(this@apply, map, style, context, uiState.events, uiState.trustScores, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { event -> viewModel.onEventSelected(event) })
+                        setupMapStyle(this@apply, map, style, context, uiState.events, uiState.trustScores, currentZoom, zoomThreshold, symbolManagerState, onEventClick = { id -> viewModel.onEventSelectedById(id) })
                     }
                 }
                 
@@ -575,7 +577,7 @@ private fun setupMapStyle(
     zoom: Double,
     zoomThreshold: Double,
     symbolManagerState: MutableState<SymbolManager?>,
-    onEventClick: (Event) -> Unit
+    onEventClick: (String) -> Unit
 ) {
     // 1. Register icons (must be re-added on style change)
     val firePin = createTacticalPinFromDrawable(context, R.drawable.local_fire_department_24dp, MeshColor.EmergencyRed)
@@ -614,16 +616,15 @@ private fun setupMapStyle(
     
     // 4. Setup interaction
     manager.addClickListener { symbol ->
-        val event = events.find { 
-            it.latitude == symbol.latLng.latitude && 
-            it.longitude == symbol.latLng.longitude 
-        }
-        if (event != null) {
-            onEventClick(event)
-            true
+        android.util.Log.d("MapScreenClick", "Symbol clicked! Data: ${symbol.data}")
+        val eventId = symbol.data?.asString
+        if (eventId != null) {
+            onEventClick(eventId)
+            return@addClickListener true
         } else {
-            false
+            android.util.Log.d("MapScreenClick", "EventId was null from symbol.data")
         }
+        false
     }
 
     // 5. Proximity Visuals Layer (Added BEFORE symbols so it sits underneath)
@@ -714,6 +715,7 @@ private fun updateSymbols(
                     .withIconAnchor(Property.ICON_ANCHOR_TOP)
                     .withIconOffset(arrayOf(0f, -0.5f)) // Anchor to top but offset so circle is on coord
                     .withIconSize(1.0f)
+                    .withData(JsonPrimitive(event.eventId))
             )
         } else {
             // ICON ONLY VIEW
@@ -732,6 +734,7 @@ private fun updateSymbols(
                     .withLatLng(LatLng(event.latitude, event.longitude))
                     .withIconImage(iconImage)
                     .withIconSize(1.0f)
+                    .withData(JsonPrimitive(event.eventId))
             )
         }
     }

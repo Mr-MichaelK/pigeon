@@ -1,41 +1,31 @@
-# PLAN: Task 8.5 - Visual Refinement
+# Architect Plan: EventDetailSheet Click Bug Fix
 
-This plan outlines the "Rugged" aesthetic overhaul for the Pigeon app, focusing on high-contrast, tactical, and functional styling as per the "Stich UI" standards.
+## Description of the Bug
+When clicking on a tactical map symbol, the `EventDetailSheet` does not appear. 
+In `MapScreen.kt`, the `addClickListener` attempts to locate the clicked event by comparing exact floating-point values of latitude and longitude:
+```kotlin
+val event = events.find { 
+    it.latitude == symbol.latLng.latitude && 
+    it.longitude == symbol.latLng.longitude 
+}
+```
+Due to precision loss when MapLibre's native C++ engine processes and returns the coordinates, this equality check almost always fails resulting in `event == null`.
 
-## Proposed Changes
+## Architectural Solution (Role: Coder Action Plan)
 
-### [Theme & Styling]
-- **MeshTheme.kt**: 
-  - Ensure `MeshColor` aligns with Tactical Sand (#F8F7F6) and Operational Gold (#DF9C20).
-  - Explicitly use `MeshColor.TextPrimary` (#171511) for heavy borders.
+To fix this reliably and robustly, we will utilize MapLibre's `data` property on `SymbolOptions` and `Symbol` to carry the unique `eventId` instead of relying on coordinate matching.
 
-### [Identity Components]
-- **IdentityComponents.kt**:
-  - **MeshRoleCard**: 
-    - Selected Border: `3.dp` width using `MeshColor.TextPrimary` for a high-contrast "Heavy Border".
-    - Font: Apply `fontFamily = FontFamily.Monospace` to the `role.title`.
-    - Shape: Standardize on `RoundedCornerShape(12.dp)` for cards.
-  - **MeshTextField**: Use `fontFamily = FontFamily.Monospace` for technical labels.
-  - **MeshAnonymousToggle**: Add a reactive **Privacy Alert** underneath when `isAnonymous` is toggled ON, using `MeshColor.AlertOrange`.
+### File Modifications
+**1. `app/src/main/java/com/example/pigeon/ui/screens/map/MapScreen.kt`**
 
-### [Map Screen]
-- **MapScreen.kt**:
-  - **LatLongPill**: Update coordinate text to use `fontFamily = FontFamily.Monospace`.
-  - **MeshHeader**: Update `MESH ACTIVE` and `SYNCED` labels to Monospace.
-  - **Report Button**: Ensure high-contrast `MeshColor.EmergencyRed` or a new `SafetyOrange`.
+- **During Symbol Creation (`setupMapStyle` ~line 711 & ~730):**
+  - Import `com.google.gson.JsonPrimitive`.
+  - Add `.withData(JsonPrimitive(event.eventId))` when creating `SymbolOptions` for both the "combined view" (labels) and the "icon only view".
 
-### [Profile Screen]
-- **ProfileScreen.kt**:
-  - **ProfileHeader**: Apply Monospace to `user.nodeName`.
-  - **MeshStatisticsSection**: Ensure all technical values (Syncs, Trust rating) use Monospace.
-  - **Action Button**: Use `MeshColor.SuccessGreen` (Signal Green) for the final "SAVE & LOCK" button to differentiate it from "RETURN TO MAP".
+- **During Symbol Click Handling (`addClickListener` ~line 616):**
+  - Read the `eventId` from the clicked symbol's data: `val eventId = symbol.data?.asString`.
+  - Find the corresponding event in the `events` list: `val event = events.find { it.eventId == eventId }`.
+  - Call `onEventClick(event)` if the event is found.
 
-## Verification Plan
-### Automated Tests
-- N/A (UI-only refinement)
-
-### Manual Verification
-- [ ] Audit Onboarding role cards for heavy borders and monospaced titles.
-- [ ] Verify `MapScreen` coordinates and status labels use monospaced fonts.
-- [ ] Confirm "Anonymous Mode" trigger provides a clear, high-contrast visual hint.
-- [ ] Verify Profile "Save & Lock" button uses the Signal Green aesthetic.
+## Next Step (Reviewer)
+Wait for user to state "Plan approved" or "Proceed".
