@@ -82,6 +82,7 @@ class ReportViewModel @Inject constructor(
             .setCreatorDeviceId(event.creatorDeviceId)
             .setIsResolved(event.isResolved)
             .setCreatorName(if (isAnonymous) "Anonymous Civilian" else event.creatorName)
+            .setTitle(event.title)
             .build()
     }
 }

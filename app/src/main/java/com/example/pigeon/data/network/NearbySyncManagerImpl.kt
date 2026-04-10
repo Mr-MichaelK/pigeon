@@ -415,7 +415,8 @@ class NearbySyncManagerImpl @Inject constructor(
             .setTimestamp(event.timestamp)
             .setCreatorDeviceId(event.creatorDeviceId)
             .setIsResolved(event.isResolved)
-            .setCreatorName(event.creatorName) // Note: Anonymization should be handled by the caller/ViewModel if specific to local user
+            .setCreatorName(event.creatorName)
+            .setTitle(event.title)
             .build()
     }
 
@@ -433,7 +434,7 @@ class NearbySyncManagerImpl @Inject constructor(
             eventId = proto.eventId,
             creatorDeviceId = proto.creatorDeviceId,
             eventType = domainType,
-            title = proto.description.take(50),
+            title = proto.title,
             description = proto.description,
             latitude = proto.latitude,
             longitude = proto.longitude,
@@ -600,11 +601,15 @@ class NearbySyncManagerImpl @Inject constructor(
     }
 
     override fun broadcastIncident(event: PigeonEvent) {
-        Log.d(TAG, "Broadcasting Immediate Incident: ${event.eventId}")
+        val reachablePeers = _nearbyPeers.value.filter { it.isConnected }
+        Log.d(TAG, "📡 [BROADCAST] Immediate Incident: ${event.eventId} to ${reachablePeers.size} connected peers.")
+        
         val payload = PigeonPayload.newBuilder().setEvent(event).build()
         val bytes = Payload.fromBytes(payload.toByteArray())
-        _nearbyPeers.value.filter { it.isConnected }.forEach { peer ->
+        
+        reachablePeers.forEach { peer ->
             if (peer.deviceId != MOCK_PEER_ID) {
+                Log.d(TAG, "   -> Sending bytes to ${peer.deviceId} (${peer.callsign})")
                 connectionsClient.sendPayload(peer.deviceId, bytes)
             }
         }

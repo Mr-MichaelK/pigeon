@@ -1,31 +1,24 @@
-# Architect Plan: EventDetailSheet Click Bug Fix
+# Architect Plan: Event Title Data Loss Fix
 
-## Description of the Bug
-When clicking on a tactical map symbol, the `EventDetailSheet` does not appear. 
-In `MapScreen.kt`, the `addClickListener` attempts to locate the clicked event by comparing exact floating-point values of latitude and longitude:
-```kotlin
-val event = events.find { 
-    it.latitude == symbol.latLng.latitude && 
-    it.longitude == symbol.latLng.longitude 
-}
-```
-Due to precision loss when MapLibre's native C++ engine processes and returns the coordinates, this equality check almost always fails resulting in `event == null`.
+## Problem
+Event titles (names) are missing or blank when synced between devices via the mesh network.
+The `PigeonEvent` protobuf message lacks a `title` field. The current implementation fallback to using a truncated `description` as the title, which fails when the description is empty.
 
-## Architectural Solution (Role: Coder Action Plan)
+## Proposed Changes
 
-To fix this reliably and robustly, we will utilize MapLibre's `data` property on `SymbolOptions` and `Symbol` to carry the unique `eventId` instead of relying on coordinate matching.
+### 1. Protobuf Update
+- **File**: `app/src/main/proto/pigeon_models.proto`
+- **Action**: Add `string title = 10;` to the `PigeonEvent` message.
 
-### File Modifications
-**1. `app/src/main/java/com/example/pigeon/ui/screens/map/MapScreen.kt`**
+### 2. Network Mapping Update (NearbySyncManagerImpl)
+- **File**: `app/src/main/java/com/example/pigeon/data/network/NearbySyncManagerImpl.kt`
+- **Actions**:
+    - Update `domainToProto`: Add `.setTitle(event.title)`.
+    - Update `protoToDomain`: Change `title = proto.description.take(50)` to `title = proto.title`.
 
-- **During Symbol Creation (`setupMapStyle` ~line 711 & ~730):**
-  - Import `com.google.gson.JsonPrimitive`.
-  - Add `.withData(JsonPrimitive(event.eventId))` when creating `SymbolOptions` for both the "combined view" (labels) and the "icon only view".
+### 3. ViewModel Mapping Update (ReportViewModel)
+- **File**: `app/src/main/java/com/example/pigeon/ui/screens/map/ReportViewModel.kt`
+- **Action**: Update `domainToProto`: Add `.setTitle(event.title)`.
 
-- **During Symbol Click Handling (`addClickListener` ~line 616):**
-  - Read the `eventId` from the clicked symbol's data: `val eventId = symbol.data?.asString`.
-  - Find the corresponding event in the `events` list: `val event = events.find { it.eventId == eventId }`.
-  - Call `onEventClick(event)` if the event is found.
-
-## Next Step (Reviewer)
+## Next Step
 Wait for user to state "Plan approved" or "Proceed".
