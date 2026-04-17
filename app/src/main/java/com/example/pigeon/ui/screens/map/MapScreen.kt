@@ -9,9 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -40,7 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.R
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
-import com.example.pigeon.ui.screens.map.components.LatLongPill
 import com.example.pigeon.ui.screens.map.components.ReportingWizardSheet
 import com.example.pigeon.ui.screens.map.components.EventDetailSheet
 import com.example.pigeon.ui.theme.MeshColor
@@ -59,11 +55,11 @@ import android.content.Context
 import android.os.Looper
 import androidx.compose.ui.graphics.toArgb
 import java.io.File
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
 
 import org.maplibre.android.style.layers.PropertyFactory.*
 import org.maplibre.android.location.engine.LocationEngineCallback
@@ -79,7 +75,8 @@ import kotlinx.coroutines.awaitCancellation
 fun MapScreen(
     viewModel: MapViewModel = hiltViewModel(),
     reportViewModel: ReportViewModel = hiltViewModel(),
-    detailViewModel: EventDetailViewModel = hiltViewModel()
+    detailViewModel: EventDetailViewModel = hiltViewModel(),
+    onHeaderClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val detailTrustScore by detailViewModel.trustScore.collectAsStateWithLifecycle()
@@ -102,7 +99,21 @@ fun MapScreen(
     
     var showReportingWizard by remember { mutableStateOf(false) }
     var hasInitialZoomed by remember { mutableStateOf(false) }
+    val isWizardLoading by viewModel.isWizardLoading.collectAsStateWithLifecycle()
+    var lastReportingClickTime by remember { mutableLongStateOf(0L) }
     
+    val snackbarHostState = remember { SnackbarHostState() }
+    val canReport by reportViewModel.canReport.collectAsStateWithLifecycle()
+    val cooldownTimeRemaining by reportViewModel.cooldownTimeRemaining.collectAsStateWithLifecycle()
+    val meshStatus by viewModel.meshStatus.collectAsStateWithLifecycle()
+    val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        reportViewModel.reportError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
+
     // Threshold for showing titles
     val zoomThreshold = 14.0
     var currentZoom by remember { mutableDoubleStateOf(uiState.metadata.zoom) }
@@ -132,6 +143,7 @@ fun MapScreen(
         MapView(context).apply {
             getMapAsync { map ->
                 mapLibreMap = map
+                map.uiSettings.isCompassEnabled = false
                 
                 val absolutePath = getOfflineMapPath(context)
                 val mbtilesUri = "mbtiles://$absolutePath"
@@ -303,8 +315,14 @@ fun MapScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Sticky Header: Mesh Status (Full Width)
-        MeshHeader()
+        // Sticky Header: Functional Mesh Status (Full Width)
+        MeshHeader(
+            latitude = uiState.metadata.latitude,
+            longitude = uiState.metadata.longitude,
+            meshStatus = meshStatus,
+            peerCount = peerCount,
+            onClick = onHeaderClick
+        )
 
         Box(modifier = Modifier.weight(1f)) {
             AndroidView(
@@ -320,42 +338,39 @@ fun MapScreen(
             )
 
             // Top Overlays
-            Row(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                // Coordinate Pill (Left)
-                LatLongPill(
-                    latitude = uiState.metadata.latitude,
-                    longitude = uiState.metadata.longitude
-                )
-
                 // Tool Stack (Right)
-                ToolStack(
-                    onMyLocationClick = {
-                        if (org.maplibre.android.location.permissions.PermissionsManager.areLocationPermissionsGranted(context)) {
-                            try {
-                                mapLibreMap?.locationComponent?.lastKnownLocation?.let { loc ->
-                                    val latLng = LatLng(loc.latitude, loc.longitude)
-                                    mapLibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14.0))
+                Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                    ToolStack(
+                        onMyLocationClick = {
+                            if (org.maplibre.android.location.permissions.PermissionsManager.areLocationPermissionsGranted(context)) {
+                                try {
+                                    mapLibreMap?.locationComponent?.lastKnownLocation?.let { loc ->
+                                        val latLng = LatLng(loc.latitude, loc.longitude)
+                                        mapLibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14.0))
+                                    }
+                                } catch (e: SecurityException) {
+                                    requestLocationPermissions()
                                 }
-                            } catch (e: SecurityException) {
+                            } else {
                                 requestLocationPermissions()
                             }
-                        } else {
-                            requestLocationPermissions()
+                        },
+                        onZoomIn = {
+                            mapLibreMap?.animateCamera(CameraUpdateFactory.zoomIn())
+                        },
+                        onZoomOut = {
+                            mapLibreMap?.animateCamera(CameraUpdateFactory.zoomOut())
+                        },
+                        onResetCooldown = {
+                            reportViewModel.resetCooldown()
                         }
-                    },
-                    onZoomIn = {
-                        mapLibreMap?.animateCamera(CameraUpdateFactory.zoomIn())
-                    },
-                    onZoomOut = {
-                        mapLibreMap?.animateCamera(CameraUpdateFactory.zoomOut())
-                    }
-                )
+                    )
+                }
             }
 
             Row(
@@ -366,22 +381,33 @@ fun MapScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(
-                    onClick = { showReportingWizard = true },
+                    onClick = { 
+                        val now = System.currentTimeMillis()
+                        if (canReport && !showReportingWizard && !isWizardLoading && (now - lastReportingClickTime > 500L)) {
+                            lastReportingClickTime = now
+                            viewModel.setWizardLoading(true)
+                            showReportingWizard = true
+                        }
+                    },
+                    enabled = canReport && !showReportingWizard && !isWizardLoading,
                     modifier = Modifier
                         .height(64.dp)
                         .weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = MeshColor.EmergencyRed),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (canReport) MeshColor.EmergencyRed else Color.Gray,
+                        disabledContainerColor = if (canReport) MeshColor.EmergencyRed.copy(alpha = 0.5f) else Color.Gray
+                    ),
                     shape = RoundedCornerShape(16.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Emergency,
+                        imageVector = if (canReport) Icons.Outlined.Emergency else Icons.Outlined.Timer,
                         contentDescription = null,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        "REPORT",
+                        if (canReport) "REPORT" else "COOLDOWN ${cooldownTimeRemaining?.let { "($it)" } ?: ""}",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 2.sp
@@ -404,28 +430,68 @@ fun MapScreen(
 
             if (showReportingWizard) {
                 ReportingWizardSheet(
-                    onDismiss = { showReportingWizard = false },
+                    onDismiss = { 
+                        showReportingWizard = false 
+                        viewModel.setWizardLoading(false)
+                    },
                     onReport = { type, title, desc, ttlHours ->
                         reportViewModel.reportEvent(
                             eventType = type,
                             title = title,
                             description = desc,
-                            ttlMillis = ttlHours * 60 * 60 * 1000,
+                            ttlMillis = ttlHours * 60 * 60 * 1000L,
                             latitude = uiState.metadata.latitude,
-                            longitude = uiState.metadata.longitude
+                            longitude = uiState.metadata.longitude,
+                            onLimitReached = { 
+                                showReportingWizard = false
+                                viewModel.setWizardLoading(false)
+                            }
                         )
+                        showReportingWizard = false
+                        viewModel.setWizardLoading(false)
                     },
                     currentLatitude = uiState.metadata.latitude,
                     currentLongitude = uiState.metadata.longitude)
+            }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp)
+            )
         }
     }
-}
 
 }
 
 @Composable
-fun MeshHeader() {
+fun MeshHeader(
+    latitude: Double,
+    longitude: Double,
+    meshStatus: com.example.pigeon.domain.network.ConnectionStatus,
+    peerCount: Int,
+    onClick: () -> Unit
+) {
+    val isTracking = meshStatus != com.example.pigeon.domain.network.ConnectionStatus.OFF
+    val statusColor = when (meshStatus) {
+        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Color(0xFF4ADE80) // Green
+        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> MeshColor.Primary // Amber/Gold
+        com.example.pigeon.domain.network.ConnectionStatus.OFF -> Color.Gray
+    }
+    
+    val statusText = when (meshStatus) {
+        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> "SYNCING"
+        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> "SEARCHING"
+        com.example.pigeon.domain.network.ConnectionStatus.OFF -> "OFFLINE"
+    }
+
+    val iconVector = when (meshStatus) {
+        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Icons.Outlined.Sync
+        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> Icons.Outlined.WifiTethering
+        com.example.pigeon.domain.network.ConnectionStatus.OFF -> Icons.Outlined.WifiTetheringOff
+    }
+
     Surface(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp),
@@ -439,15 +505,81 @@ fun MeshHeader() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier
-                    .weight(1f),
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // Left: Coordinates Section
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Pulse Icon
+                    val latStr = String.format("%.5f", latitude)
+                    val lonStr = String.format("%.5f", longitude)
+
+                    Column {
+                        Text(
+                            "TACTICAL COORDINATES",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = MeshColor.TextSecondary,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "$latStr, $lonStr",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                            fontWeight = FontWeight.Bold,
+                            color = MeshColor.TextPrimary
+                        )
+                    }
+                }
+                
+                // Right: Network Status Section
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            statusText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            color = statusColor,
+                            letterSpacing = 1.sp
+                        )
+                        if (isTracking && peerCount > 0) {
+                            Text(
+                                "$peerCount Peers Nearby",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MeshColor.TextPrimary
+                            )
+                        } else if (isTracking) {
+                            Text(
+                                "0 Peers",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MeshColor.TextSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Dynamic Icon
                     Box(contentAlignment = Alignment.Center) {
-                        val infiniteTransition = rememberInfiniteTransition(label = "MeshPulse")
+                        val infiniteTransition = rememberInfiniteTransition(label = "MeshAnim")
+                        
+                        // Icon rotation for SYNCING
+                        val rotation by infiniteTransition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(2000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "IconRotation"
+                        )
+                        
+                        // Alpha pulse for SEARCHING
                         val pulseAlpha by infiniteTransition.animateFloat(
                             initialValue = 1f,
                             targetValue = 0.2f,
@@ -461,60 +593,22 @@ fun MeshHeader() {
                         Surface(
                             modifier = Modifier.size(40.dp),
                             shape = CircleShape,
-                            color = MeshColor.Primary.copy(alpha = 0.1f)
+                            color = statusColor.copy(alpha = 0.1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.WifiTethering,
-                                contentDescription = "Mesh Active",
-                                tint = MeshColor.MeshBlue,
-                                modifier = Modifier.padding(8.dp)
+                                imageVector = iconVector,
+                                contentDescription = "Mesh Status",
+                                tint = statusColor.copy(alpha = if (meshStatus == com.example.pigeon.domain.network.ConnectionStatus.PASSIVE) pulseAlpha else 1f),
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .run {
+                                        if (meshStatus == com.example.pigeon.domain.network.ConnectionStatus.ACTIVE) {
+                                            this.rotate(rotation)
+                                        } else this
+                                    }
                             )
                         }
-                        
-                        // Status dot
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .align(Alignment.TopEnd)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4ADE80).copy(alpha = pulseAlpha))
-                                .border(1.5.dp, MeshColor.Surface, CircleShape)
-                        )
                     }
-                    
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    Column {
-                        Text(
-                            "MESH ACTIVE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Black,
-                            color = MeshColor.TextPrimary,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            "CONNECTED",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MeshColor.TextSecondary
-                        )
-                    }
-                }
-                
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        "2m ago",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Black,
-                        color = MeshColor.TextPrimary
-                    )
-                    Text(
-                        "SYNCED",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MeshColor.TextSecondary,
-                        letterSpacing = 1.sp
-                    )
                 }
             }
         }
@@ -525,7 +619,8 @@ fun MeshHeader() {
 fun ToolStack(
     onMyLocationClick: () -> Unit,
     onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit
+    onZoomOut: () -> Unit,
+    onResetCooldown: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Near Me Button
@@ -557,10 +652,28 @@ fun ToolStack(
                 IconButton(onClick = onZoomIn, modifier = Modifier.size(40.dp)) {
                     Icon(Icons.Outlined.Add, contentDescription = "Zoom In", tint = MeshColor.TextPrimary)
                 }
-                Divider(modifier = Modifier.width(20.dp), color = MeshColor.TextPrimary.copy(alpha = 0.1f))
+                HorizontalDivider(modifier = Modifier.width(20.dp), color = MeshColor.TextPrimary.copy(alpha = 0.1f))
                 IconButton(onClick = onZoomOut, modifier = Modifier.size(40.dp)) {
                     Icon(Icons.Outlined.Remove, contentDescription = "Zoom Out", tint = MeshColor.TextPrimary)
                 }
+            }
+        }
+
+        // Debug Reset Button
+        Surface(
+            onClick = onResetCooldown,
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = MeshColor.Surface.copy(alpha = 0.9f),
+            shadowElevation = 4.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.BugReport,
+                    contentDescription = "Reset Cooldown",
+                    tint = MeshColor.Primary,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }
@@ -602,15 +715,36 @@ private fun setupMapStyle(
 
     defaultPin?.let { style.addImage("default-pin", it) }
 
-    // 2. Clear old manager if exists
+    // 2. Proximity Visuals Layer (Added BEFORE symbols so it sits underneath)
+    if (style.getSource("proximity-source") == null) {
+        style.addSource(GeoJsonSource("proximity-source"))
+        
+        val proximityFillLayer = FillLayer("proximity-fill-layer", "proximity-source")
+            .withProperties(
+                fillColor("rgba(0, 255, 0, 0.10)") // #00FF00 with 10% alpha
+            )
+            
+        val proximityLineLayer = LineLayer("proximity-line-layer", "proximity-source")
+            .withProperties(
+                lineColor("rgba(0, 255, 0, 0.50)"), // #00FF00 with 50% alpha
+                lineWidth(2f)
+            )
+            
+        style.addLayer(proximityFillLayer)
+        style.addLayer(proximityLineLayer)
+    }
+
+    // 3. Clear old manager if exists
     symbolManagerState.value?.let { oldManager ->
         try { oldManager.onDestroy() } catch (e: Exception) {}
     }
     
-    // 3. Create new manager for the new style
+    // 4. Create new manager for the new style
     val manager = SymbolManager(mapView, map, style).apply {
         iconAllowOverlap = true
         textAllowOverlap = true
+        iconIgnorePlacement = true
+        textIgnorePlacement = true
     }
     symbolManagerState.value = manager
     
@@ -627,19 +761,7 @@ private fun setupMapStyle(
         false
     }
 
-    // 5. Proximity Visuals Layer (Added BEFORE symbols so it sits underneath)
-    if (style.getSource("proximity-source") == null) {
-        style.addSource(GeoJsonSource("proximity-source"))
-        val proximityLayer = FillLayer("proximity-layer", "proximity-source")
-            .withProperties(
-                fillColor("rgba(223, 156, 32, 0.15)"), // Operational Gold with 0.15 alpha
-                fillOutlineColor("rgba(223, 156, 32, 0.4)")
-            )
-        // Add at top for testing visibility
-        style.addLayer(proximityLayer)
-    }
-
-    // 6. Initial content
+    // 5. Initial content
     enableLocationComponent(map, style, context)
     updateSymbols(context, manager, style, events, trustScores, zoom >= zoomThreshold)
     

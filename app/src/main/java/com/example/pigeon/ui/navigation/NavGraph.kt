@@ -81,7 +81,17 @@ fun PigeonNavGraph(
                     )
                 }
                 composable(Screen.Map.route) {
-                    MapScreen()
+                    MapScreen(
+                        onHeaderClick = {
+                            navController.navigate(Screen.Radar.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
                 }
                 composable(Screen.Radar.route) {
                     com.example.pigeon.ui.screens.radar.RadarScreen()

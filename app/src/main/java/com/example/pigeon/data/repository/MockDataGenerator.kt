@@ -16,11 +16,12 @@ class MockDataGenerator @Inject constructor() {
         val baseLon = 35.5018
 
         // Generate 5 mock events
-        for (i in 1..5) {
-            val type = EventType.values().random()
+        for (_i in 1..5) {
+            val type = EventType.entries.random()
             val isResolved = Random.nextBoolean()
             // Random time within last 48 hours
             val timestamp = System.currentTimeMillis() - Random.nextLong(0, 48 * 60 * 60 * 1000)
+            val ttl = 72 * 60 * 60 * 1000L
             
             events.add(
                 EventEntity(
@@ -34,7 +35,8 @@ class MockDataGenerator @Inject constructor() {
                     timestamp = timestamp,
                     isResolved = isResolved,
                     creatorName = mockNames.random(),
-                    ttl = 72 * 60 * 60 * 1000
+                    ttl = ttl,
+                    expiryTimestamp = timestamp + ttl
                 )
             )
         }

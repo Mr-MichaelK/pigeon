@@ -417,6 +417,7 @@ class NearbySyncManagerImpl @Inject constructor(
             .setIsResolved(event.isResolved)
             .setCreatorName(event.creatorName)
             .setTitle(event.title)
+            .setExpiryTimestamp(event.expiryTimestamp)
             .build()
     }
 
@@ -430,18 +431,31 @@ class NearbySyncManagerImpl @Inject constructor(
             com.example.pigeon.proto.EventType.SOS -> EventType.SOS
             else -> EventType.CUSTOM
         }
+        val now = System.currentTimeMillis()
+        val maxExpiry = now + (7 * 24 * 60 * 60 * 1000L) // 7 Days Hard Cap
+        
+        // Sanitation: Cap received expiry at 7 days from now
+        val sanitizedExpiry = if (proto.expiryTimestamp == 0L) {
+             now + 3600000 // Default 1H if missing
+        } else {
+             minOf(proto.expiryTimestamp, maxExpiry)
+        }
+
+        val safeTitle = if (proto.title.isBlank()) "Unknown Incident" else proto.title
+
         return Event(
             eventId = proto.eventId,
             creatorDeviceId = proto.creatorDeviceId,
             eventType = domainType,
-            title = proto.title,
+            title = safeTitle,
             description = proto.description,
             latitude = proto.latitude,
             longitude = proto.longitude,
             timestamp = proto.timestamp,
             isResolved = proto.isResolved,
             creatorName = proto.creatorName,
-            ttl = 3600000 // Default 1H for synced events
+            ttl = sanitizedExpiry - proto.timestamp,
+            expiryTimestamp = sanitizedExpiry
         )
     }
 

@@ -50,6 +50,18 @@ class MapViewModel @Inject constructor(
 
     private val _selectedEvent = MutableStateFlow<Event?>(null)
 
+    private val _isWizardLoading = MutableStateFlow(false)
+    val isWizardLoading: StateFlow<Boolean> = _isWizardLoading
+
+    fun setWizardLoading(isLoading: Boolean) {
+        _isWizardLoading.value = isLoading
+    }
+
+    val meshStatus: StateFlow<com.example.pigeon.domain.network.ConnectionStatus> = nearbySyncManager.status
+    val peerCount: StateFlow<Int> = nearbySyncManager.nearbyPeers
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<MapUiState> = combine(
         _metadata,

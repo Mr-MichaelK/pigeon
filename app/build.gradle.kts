@@ -10,6 +10,7 @@ plugins {
 android {
     namespace = "com.example.pigeon"
     compileSdk = 35
+    ndkVersion = "28.0.12433566"
     
     defaultConfig {
         applicationId = "com.example.pigeon"
@@ -62,6 +63,10 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+    }
+
+    androidResources {
+        noCompress.add("so")
     }
 }
 

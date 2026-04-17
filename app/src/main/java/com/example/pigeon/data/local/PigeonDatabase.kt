@@ -70,9 +70,18 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // Add the expiryTimestamp column with a default 0
+        database.execSQL("ALTER TABLE `events` ADD COLUMN `expiryTimestamp` INTEGER NOT NULL DEFAULT 0")
+        // Update existing rows: default to 72 hours from original timestamp
+        database.execSQL("UPDATE `events` SET `expiryTimestamp` = timestamp + 259200000")
+    }
+}
+
 @Database(
     entities = [UserEntity::class, EventEntity::class, VerificationEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)

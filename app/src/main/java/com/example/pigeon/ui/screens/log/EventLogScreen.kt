@@ -286,10 +286,15 @@ fun EventLogItem(
                             text = event.creatorDeviceId,
                             style = MaterialTheme.typography.labelSmall,
                             color = MeshColor.TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
+                                .weight(1f)
                                 .background(MeshColor.Background, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
                         
                         if (!event.isResolved) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

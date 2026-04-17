@@ -11,4 +11,7 @@ interface EventRepository {
     suspend fun searchEvents(query: String): List<Event>
     suspend fun populateMockData()
     suspend fun clearAllEvents()
+    suspend fun getRecentEventCount(creatorId: String, sinceTimestamp: Long): Int
+    suspend fun getCooldownBaseTimestamp(creatorId: String, sinceTimestamp: Long): Long?
+    suspend fun resetUserCooldown(creatorId: String, sinceTimestamp: Long)
 }
