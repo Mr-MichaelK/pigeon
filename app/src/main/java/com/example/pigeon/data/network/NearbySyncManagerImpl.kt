@@ -555,14 +555,15 @@ class NearbySyncManagerImpl @Inject constructor(
 
         when (newState) {
             MeshPowerState.ACTIVE -> {
-                Log.d(TAG, "Power ACTIVE. Starting Discovery.")
+                Log.d(TAG, "Power ACTIVE. Starting simultaneous Advertising + Discovery (high-power).")
                 _status.value = ConnectionStatus.ACTIVE
-                startDiscovery()
+                startAdvertising(lowPower = false)
+                startDiscovery(lowPower = false)
             }
             MeshPowerState.PASSIVE -> {
-                Log.d(TAG, "Power PASSIVE. Starting Advertising.")
+                Log.d(TAG, "Power PASSIVE. Starting low-power Advertising only.")
                 _status.value = ConnectionStatus.PASSIVE
-                startAdvertising()
+                startAdvertising(lowPower = true)
             }
             MeshPowerState.OFF -> {
                 Log.d(TAG, "Power OFF. Quiet mode engaged.")
@@ -571,12 +572,15 @@ class NearbySyncManagerImpl @Inject constructor(
         }
     }
 
-    private fun startAdvertising() {
-        val advertisingOptions = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
+    private fun startAdvertising(lowPower: Boolean = true) {
+        val advertisingOptions = AdvertisingOptions.Builder()
+            .setStrategy(Strategy.P2P_CLUSTER)
+            .setLowPower(lowPower)
+            .build()
         connectionsClient.startAdvertising(
             "PigeonNode", SERVICE_ID, connectionLifecycleCallback, advertisingOptions
         ).addOnSuccessListener {
-            Log.d(TAG, "Advertising started successfully.")
+            Log.d(TAG, "Advertising started (lowPower=$lowPower).")
         }.addOnFailureListener { e ->
             Log.e(TAG, "Failed to start advertising.", e)
             if (e is com.google.android.gms.common.api.ApiException) {
@@ -586,12 +590,15 @@ class NearbySyncManagerImpl @Inject constructor(
         }
     }
 
-    private fun startDiscovery() {
-        val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
+    private fun startDiscovery(lowPower: Boolean = false) {
+        val discoveryOptions = DiscoveryOptions.Builder()
+            .setStrategy(Strategy.P2P_CLUSTER)
+            .setLowPower(lowPower)
+            .build()
         connectionsClient.startDiscovery(
             SERVICE_ID, endpointDiscoveryCallback, discoveryOptions
         ).addOnSuccessListener {
-            Log.d(TAG, "Discovery started successfully.")
+            Log.d(TAG, "Discovery started (lowPower=$lowPower).")
         }.addOnFailureListener { e ->
             Log.e(TAG, "Failed to start discovery.", e)
             if (e is com.google.android.gms.common.api.ApiException) {

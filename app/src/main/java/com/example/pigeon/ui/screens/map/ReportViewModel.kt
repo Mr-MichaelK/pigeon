@@ -106,7 +106,9 @@ class ReportViewModel @Inject constructor(
                 longitude = longitude,
                 timestamp = now,
                 isResolved = false,
-                creatorName = user?.displayName ?: "Unknown",
+                creatorName = user?.displayName.takeIf { !it.isNullOrBlank() } 
+                    ?: user?.nodeName.takeIf { !it.isNullOrBlank() } 
+                    ?: "Unknown",
                 ttl = sanitizedTtl,
                 expiryTimestamp = now + sanitizedTtl
             )

@@ -283,7 +283,7 @@ fun EventLogItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = event.creatorDeviceId,
+                            text = event.creatorName,
                             style = MaterialTheme.typography.labelSmall,
                             color = MeshColor.TextSecondary,
                             maxLines = 1,
