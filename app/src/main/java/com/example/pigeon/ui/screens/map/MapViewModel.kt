@@ -50,6 +50,9 @@ class MapViewModel @Inject constructor(
 
     private val _selectedEvent = MutableStateFlow<Event?>(null)
 
+    private val _pendingCameraTarget = MutableStateFlow<LatLng?>(null)
+    val pendingCameraTarget: StateFlow<LatLng?> = _pendingCameraTarget.asStateFlow()
+
     private val _isWizardLoading = MutableStateFlow(false)
     val isWizardLoading: StateFlow<Boolean> = _isWizardLoading
 
@@ -153,5 +156,27 @@ class MapViewModel @Inject constructor(
     fun onEventSelectedById(eventId: String) {
         val event = uiState.value.events.find { it.eventId == eventId }
         _selectedEvent.value = event
+    }
+
+    fun consumeDeepLinkEventId(eventId: String) {
+        // Wait for events to be available and then select + signal camera
+        viewModelScope.launch {
+            // Retry briefly in case events haven't loaded yet
+            var tries = 0
+            var event = uiState.value.events.find { it.eventId == eventId }
+            while (event == null && tries < 10) {
+                kotlinx.coroutines.delay(200)
+                event = uiState.value.events.find { it.eventId == eventId }
+                tries++
+            }
+            if (event != null) {
+                _selectedEvent.value = event
+                _pendingCameraTarget.value = LatLng(event.latitude, event.longitude)
+            }
+        }
+    }
+
+    fun clearPendingCameraTarget() {
+        _pendingCameraTarget.value = null
     }
 }

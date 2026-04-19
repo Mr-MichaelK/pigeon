@@ -10,6 +10,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.example.pigeon.domain.repository.UserRepository
 import com.example.pigeon.ui.screens.onboarding.OnboardingScreen
 import com.example.pigeon.ui.screens.map.MapScreen
@@ -32,7 +34,10 @@ import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
-    object Map : Screen("map")
+    object Map : Screen("map") {
+        const val routeWithArgs = "map?eventId={eventId}"
+        fun deepLink(eventId: String) = "map?eventId=$eventId"
+    }
     object Radar : Screen("radar")
     object Log : Screen("log")
     object Profile : Screen("profile")
@@ -51,7 +56,7 @@ fun PigeonNavGraph(
 
     LaunchedEffect(Unit) {
         val userVal = userRepository.getUser().first()
-        startDestination = if (userVal == null) Screen.Onboarding.route else Screen.Map.route
+        startDestination = if (userVal == null) Screen.Onboarding.route else Screen.Map.routeWithArgs
     }
 
     startDestination?.let { destination ->
@@ -74,14 +79,25 @@ fun PigeonNavGraph(
                     OnboardingScreen(
                         viewModel = viewModel,
                         onJoinComplete = {
-                            navController.navigate(Screen.Map.route) {
+                            navController.navigate(Screen.Map.routeWithArgs) {
                                 popUpTo(Screen.Onboarding.route) { inclusive = true }
                             }
                         }
                     )
                 }
-                composable(Screen.Map.route) {
+                composable(
+                    route = Screen.Map.routeWithArgs,
+                    arguments = listOf(
+                        navArgument("eventId") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        }
+                    )
+                ) { backStackEntry ->
+                    val eventId = backStackEntry.arguments?.getString("eventId")
                     MapScreen(
+                        deepLinkEventId = eventId,
                         onHeaderClick = {
                             navController.navigate(Screen.Radar.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -99,7 +115,15 @@ fun PigeonNavGraph(
                 composable(Screen.Log.route) {
                     val viewModel: com.example.pigeon.ui.screens.log.EventLogViewModel = hiltViewModel()
                     com.example.pigeon.ui.screens.log.EventLogScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onLongPressEvent = { eventId ->
+                            navController.navigate(Screen.Map.deepLink(eventId)) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = false
+                                }
+                                launchSingleTop = true
+                            }
+                        }
                     )
                 }
                 composable(Screen.Profile.route) {

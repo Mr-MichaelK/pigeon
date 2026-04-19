@@ -2,6 +2,7 @@ package com.example.pigeon.ui.screens.log
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,11 +17,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
@@ -31,9 +37,11 @@ import org.maplibre.android.geometry.LatLng
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun EventLogScreen(
-    viewModel: EventLogViewModel
+    viewModel: EventLogViewModel,
+    onLongPressEvent: (eventId: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -92,7 +100,8 @@ fun EventLogScreen(
                     EventLogItem(
                         event = event,
                         userLocation = uiState.userLocation,
-                        onResolve = { viewModel.onResolveEvent(event.eventId) }
+                        onResolve = { viewModel.onResolveEvent(event.eventId) },
+                        onLongPress = { onLongPressEvent(event.eventId) }
                     )
                 }
             }
@@ -189,12 +198,21 @@ fun EventLogFilterRow(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun EventLogItem(
     event: Event,
     userLocation: LatLng?,
-    onResolve: () -> Unit
+    onResolve: () -> Unit,
+    onLongPress: () -> Unit = {}
 ) {
+    val haptic = LocalHapticFeedback.current
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 300f),
+        label = "LongPressScale"
+    )
     val distance = remember(event, userLocation) {
         if (userLocation != null) {
             LocationUtils.calculateDistance(
@@ -234,9 +252,21 @@ fun EventLogItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+        Column(modifier = Modifier
+            .padding(bottom = 16.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+        ) {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            isPressed = true
+                            onLongPress()
+                        }
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MeshColor.Surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),

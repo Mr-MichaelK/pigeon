@@ -76,6 +76,7 @@ fun MapScreen(
     viewModel: MapViewModel = hiltViewModel(),
     reportViewModel: ReportViewModel = hiltViewModel(),
     detailViewModel: EventDetailViewModel = hiltViewModel(),
+    deepLinkEventId: String? = null,
     onHeaderClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -88,6 +89,11 @@ fun MapScreen(
         }
     }
 
+    // Consume deep-link event ID from Log screen long-press
+    LaunchedEffect(deepLinkEventId) {
+        deepLinkEventId?.let { viewModel.consumeDeepLinkEventId(it) }
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -98,7 +104,8 @@ fun MapScreen(
     val verificationRadiusMeters = 500.0
     
     var showReportingWizard by remember { mutableStateOf(false) }
-    var hasInitialZoomed by remember { mutableStateOf(false) }
+    // If we arrived via a deep-link, skip auto-zoom-to-user so the event fly-to wins
+    var hasInitialZoomed by remember { mutableStateOf(deepLinkEventId != null) }
     val isWizardLoading by viewModel.isWizardLoading.collectAsStateWithLifecycle()
     var lastReportingClickTime by remember { mutableLongStateOf(0L) }
     
@@ -252,6 +259,19 @@ fun MapScreen(
     }
 
     // Connection state removed - Map stays offline
+
+    // Fly to event when deep-linked from Log screen
+    // Keys on BOTH pendingCameraTarget AND mapLibreMap so it re-fires once the map finishes loading
+    val pendingCameraTarget by viewModel.pendingCameraTarget.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingCameraTarget, mapLibreMap) {
+        val target = pendingCameraTarget ?: return@LaunchedEffect
+        val map = mapLibreMap ?: return@LaunchedEffect
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(target, 15.0),
+            800
+        )
+        viewModel.clearPendingCameraTarget()
+    }
 
     // React to event changes, trust score updates, OR zoom threshold cross to update symbols
     val showTitles = currentZoom >= zoomThreshold
