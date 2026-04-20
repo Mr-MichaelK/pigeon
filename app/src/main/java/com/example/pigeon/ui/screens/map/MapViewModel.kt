@@ -126,8 +126,11 @@ class MapViewModel @Inject constructor(
 
     init {
         // Task 8.6: Auto-activate mesh to PASSIVE (Advertising) on startup
-        // This ensures the device is visible to others immediately.
-        nearbySyncManager.togglePowerState(com.example.pigeon.domain.model.MeshPowerState.PASSIVE, isSticky = false)
+        // This ensures the device is visible to others immediately,
+        // without overriding an existing user-initiated ACTIVE state.
+        if (nearbySyncManager.status.value == com.example.pigeon.domain.network.ConnectionStatus.OFF) {
+            nearbySyncManager.togglePowerState(com.example.pigeon.domain.model.MeshPowerState.PASSIVE, isSticky = false)
+        }
     }
 
     fun onMapMoved(latitude: Double, longitude: Double, zoom: Double) {
