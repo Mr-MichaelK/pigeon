@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -52,7 +54,6 @@ import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.style.layers.Property
 import android.content.Context
-import android.os.Looper
 import androidx.compose.ui.graphics.toArgb
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -62,12 +63,7 @@ import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 
 import org.maplibre.android.style.layers.PropertyFactory.*
-import org.maplibre.android.location.engine.LocationEngineCallback
-import org.maplibre.android.location.engine.LocationEngineResult
-import org.maplibre.android.location.engine.LocationEngineRequest
 import com.google.gson.JsonPrimitive
-
-import kotlinx.coroutines.awaitCancellation
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,7 +96,6 @@ fun MapScreen(
     
     // Map State
     val symbolManagerState = remember { mutableStateOf<SymbolManager?>(null) }
-    var userLocation by remember { mutableStateOf<LatLng?>(null) }
     val verificationRadiusMeters = 500.0
     
     var showReportingWizard by remember { mutableStateOf(false) }
@@ -114,6 +109,7 @@ fun MapScreen(
     val cooldownTimeRemaining by reportViewModel.cooldownTimeRemaining.collectAsStateWithLifecycle()
     val meshStatus by viewModel.meshStatus.collectAsStateWithLifecycle()
     val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
+    val gpsAccuracy by viewModel.gpsAccuracy.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         reportViewModel.reportError.collect { errorMsg ->
@@ -133,6 +129,7 @@ fun MapScreen(
             mapLibreMap?.getStyle { style: Style ->
                 enableLocationComponent(mapLibreMap!!, style, context)
             }
+            viewModel.startLocationUpdates()
         }
     }
 
@@ -193,62 +190,17 @@ fun MapScreen(
                     }
                 }
 
-                // Initial location capture
-                try {
-                    map.locationComponent.lastKnownLocation?.let { 
-                        userLocation = LatLng(it.latitude, it.longitude)
-                        viewModel.updateLocation(userLocation!!)
-                    }
-                } catch (e: Exception) {}
+                // Start GPS-only location updates once the map is ready
+                viewModel.startLocationUpdates()
             }
         }
     }
 
-    // Monitor User Location
-    LaunchedEffect(mapLibreMap) {
+    // Update Proximity Circle Visuals from GPS-verified location
+    LaunchedEffect(uiState.userLocation) {
         val map = mapLibreMap ?: return@LaunchedEffect
-        val locationComponent = map.locationComponent
-        
-        // Wait for activation
-        while (!locationComponent.isLocationComponentActivated) {
-            delay(500)
-        }
-        
-        val engine = locationComponent.locationEngine ?: return@LaunchedEffect
-        
-        val listener = object : LocationEngineCallback<LocationEngineResult> {
-            override fun onSuccess(result: LocationEngineResult?) {
-                result?.lastLocation?.let { location ->
-                    val latLng = LatLng(location.latitude, location.longitude)
-                    if (hasInitialZoomed) {
-                        viewModel.updateLocation(latLng)
-                    }
-                }
-            }
-            override fun onFailure(exception: Exception) {}
-        }
-        
-        val request = LocationEngineRequest.Builder(1000L).build()
-        if (org.maplibre.android.location.permissions.PermissionsManager.areLocationPermissionsGranted(context)) {
-            try {
-                engine.requestLocationUpdates(request, listener, Looper.getMainLooper())
-            } catch (e: SecurityException) {
-                Log.e("MAP_DEBUG", "SecurityException during location updates: ${e.message}")
-            }
-        }
-        
-        try {
-            awaitCancellation()
-        } finally {
-            engine.removeLocationUpdates(listener)
-        }
-    }
+        val loc = uiState.userLocation ?: return@LaunchedEffect
 
-    // Update Proximity Circle Visuals
-    LaunchedEffect(userLocation) {
-        val map = mapLibreMap ?: return@LaunchedEffect
-        val loc = userLocation ?: return@LaunchedEffect
-        
         map.getStyle { style ->
             val source = style.getSourceAs<GeoJsonSource>("proximity-source")
             if (source != null) {
@@ -315,15 +267,21 @@ fun MapScreen(
         }
     }
 
-    // Connect Lifecycle to MapView
+    // Connect Lifecycle to MapView and GPS
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_CREATE -> mapView.onCreate(Bundle())
                 Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_RESUME -> {
+                    mapView.onResume()
+                    viewModel.startLocationUpdates()
+                }
                 Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                Lifecycle.Event.ON_STOP -> {
+                    mapView.onStop()
+                    viewModel.stopLocationUpdates()
+                }
                 Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
                 else -> {}
             }
@@ -341,6 +299,7 @@ fun MapScreen(
             longitude = uiState.metadata.longitude,
             meshStatus = meshStatus,
             peerCount = peerCount,
+            gpsAccuracy = gpsAccuracy,
             onClick = onHeaderClick
         )
 
@@ -489,15 +448,16 @@ fun MeshHeader(
     longitude: Double,
     meshStatus: com.example.pigeon.domain.network.ConnectionStatus,
     peerCount: Int,
+    gpsAccuracy: Float?,
     onClick: () -> Unit
 ) {
     val isTracking = meshStatus != com.example.pigeon.domain.network.ConnectionStatus.OFF
     val statusColor = when (meshStatus) {
-        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Color(0xFF4ADE80) // Green
-        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> MeshColor.Primary // Amber/Gold
+        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Color(0xFF4ADE80)
+        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> MeshColor.Primary
         com.example.pigeon.domain.network.ConnectionStatus.OFF -> Color.Gray
     }
-    
+
     val statusText = when (meshStatus) {
         com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> "SYNCING"
         com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> "SEARCHING"
@@ -510,18 +470,32 @@ fun MeshHeader(
         com.example.pigeon.domain.network.ConnectionStatus.OFF -> Icons.Outlined.WifiTetheringOff
     }
 
+    val isAcquiring = gpsAccuracy != null && gpsAccuracy > 100f
+
+    // Always declared so composable call order is stable
+    val gpsTransition = rememberInfiniteTransition(label = "GpsAcquiringAnim")
+    val gpsAlpha by gpsTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "GpsAlpha"
+    )
+
     Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp),
+            .heightIn(min = 72.dp),
         color = MeshColor.Surface,
         border = BorderStroke(1.dp, MeshColor.Border)
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -536,7 +510,7 @@ fun MeshHeader(
 
                     Column {
                         Text(
-                            "TACTICAL COORDINATES",
+                            "COORDINATES",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
                             color = MeshColor.TextSecondary,
@@ -549,6 +523,26 @@ fun MeshHeader(
                             fontWeight = FontWeight.Bold,
                             color = MeshColor.TextPrimary
                         )
+                        if (isAcquiring) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(MeshColor.AlertOrange.copy(alpha = gpsAlpha))
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "ACQUIRING · ${gpsAccuracy!!.toInt()}m",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeshColor.AlertOrange.copy(alpha = gpsAlpha),
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
                     }
                 }
                 

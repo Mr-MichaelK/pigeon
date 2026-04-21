@@ -29,7 +29,8 @@ data class MapUiState(
     val selectedEvent: Event? = null,
     val isWithinRadius: Boolean = false,
     val distanceMeters: Double? = null,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val userLocation: org.maplibre.android.geometry.LatLng? = null
 )
 
 @HiltViewModel
@@ -59,6 +60,9 @@ class MapViewModel @Inject constructor(
     fun setWizardLoading(isLoading: Boolean) {
         _isWizardLoading.value = isLoading
     }
+
+    val gpsAccuracy: StateFlow<Float?> = locationRepository.gpsAccuracy
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val meshStatus: StateFlow<com.example.pigeon.domain.network.ConnectionStatus> = nearbySyncManager.status
     val peerCount: StateFlow<Int> = nearbySyncManager.nearbyPeers
@@ -111,16 +115,17 @@ class MapViewModel @Inject constructor(
         val distance = if (userLoc != null && selectedEvent != null) {
             LocationUtils.calculateDistance(userLoc.latitude, userLoc.longitude, selectedEvent.latitude, selectedEvent.longitude)
         } else null
-        
+
         val isQualified = distance != null && distance <= 500.0
-        
+
         return MapUiState(
             metadata = metadata,
             events = events,
             trustScores = trustMap,
             selectedEvent = selectedEvent,
             isWithinRadius = isQualified,
-            distanceMeters = distance
+            distanceMeters = distance,
+            userLocation = userLoc
         )
     }
 
@@ -150,6 +155,14 @@ class MapViewModel @Inject constructor(
 
     fun updateLocation(location: LatLng) {
         locationRepository.updateLocation(location)
+    }
+
+    fun startLocationUpdates() {
+        locationRepository.startLocationUpdates()
+    }
+
+    fun stopLocationUpdates() {
+        locationRepository.stopLocationUpdates()
     }
 
     fun onEventSelected(event: Event?) {

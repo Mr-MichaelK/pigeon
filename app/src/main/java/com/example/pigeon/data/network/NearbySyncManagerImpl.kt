@@ -63,6 +63,8 @@ class NearbySyncManagerImpl @Inject constructor(
     private val connectionsClient = Nearby.getConnectionsClient(context)
     private val debugScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    private var localAdvertiseName: String = "PigeonNode"
+
     private val _status = MutableStateFlow<ConnectionStatus>(ConnectionStatus.OFF)
     override val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
 
@@ -78,6 +80,18 @@ class NearbySyncManagerImpl @Inject constructor(
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncStates = mutableMapOf<String, SyncState>()
+
+    init {
+        syncScope.launch {
+            userRepository.getUser().collect { user ->
+                localAdvertiseName = when {
+                    user == null -> "PigeonNode"
+                    user.isAnonymous -> user.nodeId.ifBlank { user.nodeName }
+                    else -> user.displayName.ifBlank { "PigeonNode" }
+                }
+            }
+        }
+    }
 
     private data class SyncState(
         val expectedIds: MutableSet<String> = mutableSetOf(),
@@ -220,7 +234,7 @@ class NearbySyncManagerImpl @Inject constructor(
                 handleConnectionInitiated(endpointId, MOCK_PEER_NAME)
             }
         } else {
-            connectionsClient.requestConnection("PigeonNode", endpointId, connectionLifecycleCallback)
+            connectionsClient.requestConnection(localAdvertiseName, endpointId, connectionLifecycleCallback)
                 .addOnFailureListener { Log.e(TAG, "Failed to request connection to $endpointId", it) }
         }
     }
@@ -578,7 +592,7 @@ class NearbySyncManagerImpl @Inject constructor(
             .setLowPower(lowPower)
             .build()
         connectionsClient.startAdvertising(
-            "PigeonNode", SERVICE_ID, connectionLifecycleCallback, advertisingOptions
+            localAdvertiseName, SERVICE_ID, connectionLifecycleCallback, advertisingOptions
         ).addOnSuccessListener {
             Log.d(TAG, "Advertising started (lowPower=$lowPower).")
         }.addOnFailureListener { e ->

@@ -10,8 +10,6 @@ interface UserRepository {
     fun getUser(): Flow<User?>
     suspend fun saveUser(user: User)
     suspend fun isProfileLocked(): Boolean
-    suspend fun debugResetTimer()
-    suspend fun debugLockProfile()
     suspend fun incrementSyncCount()
     suspend fun updateTrustScore(score: Float)
     suspend fun getOrGenerateNodeName(): String

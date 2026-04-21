@@ -152,6 +152,12 @@ fun MeshRoleCard(
     }
 }
 
+private fun Gender.displayLabel() = when (this) {
+    Gender.MALE -> "MALE"
+    Gender.FEMALE -> "FEMALE"
+    Gender.UNDISCLOSED -> "N/A"
+}
+
 @Composable
 fun MeshGenderSelector(
     selectedGender: Gender,
@@ -172,7 +178,7 @@ fun MeshGenderSelector(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(52.dp)
                 .background(MeshColor.Surface, RoundedCornerShape(8.dp))
                 .border(1.dp, MeshColor.Border, RoundedCornerShape(8.dp)),
             verticalAlignment = Alignment.CenterVertically
@@ -183,18 +189,23 @@ fun MeshGenderSelector(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .background(if (isSelected) MeshColor.Primary.copy(alpha = 0.2f) else Color.Transparent)
+                        .background(
+                            if (isSelected) MeshColor.Primary.copy(alpha = 0.12f) else Color.Transparent,
+                            if (index == 0) RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp)
+                            else if (index == Gender.values().size - 1) RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
+                            else RoundedCornerShape(0.dp)
+                        )
                         .clickable { onGenderSelected(gender) },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = gender.name,
+                        text = gender.displayLabel(),
                         color = if (isSelected) MeshColor.Primary else MeshColor.TextSecondary,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
                     )
                 }
-                
+
                 if (index < Gender.values().size - 1) {
                     Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(MeshColor.Border))
                 }

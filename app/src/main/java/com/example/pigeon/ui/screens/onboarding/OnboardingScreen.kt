@@ -1,5 +1,13 @@
 package com.example.pigeon.ui.screens.onboarding
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +24,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.SignalWifiStatusbarConnectedNoInternet4
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,13 +36,18 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.checkSelfPermission
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.ui.components.*
 import com.example.pigeon.ui.theme.MeshColor
+import android.content.pm.PackageManager
 
 @Composable
 fun OnboardingScreen(
@@ -42,6 +56,29 @@ fun OnboardingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+
+    var showPermissionWarning by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        if (result.values.all { it }) {
+            showPermissionWarning = false
+            viewModel.joinMesh()
+        } else {
+            showPermissionWarning = true
+        }
+    }
+
+    fun requestOrJoin() {
+        if (hasMeshPermissions(context)) {
+            showPermissionWarning = false
+            viewModel.joinMesh()
+        } else {
+            permissionLauncher.launch(getMeshPermissions())
+        }
+    }
 
     LaunchedEffect(uiState.isProfileCreated) {
         if (uiState.isProfileCreated) {
@@ -145,10 +182,26 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Permission warning — shown after denial
+            if (showPermissionWarning) {
+                MeshPermissionWarningBanner(
+                    onGrant = { permissionLauncher.launch(getMeshPermissions()) },
+                    onOpenSettings = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                        )
+                    },
+                    onContinueAnyway = { viewModel.joinMesh() }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             // Save Button
             MeshSaveButton(
                 text = "JOIN MESH",
-                onClick = viewModel::joinMesh,
+                onClick = { requestOrJoin() },
                 enabled = uiState.displayName.isNotBlank()
             )
         }
@@ -349,3 +402,107 @@ fun MeshSaveButton(
         }
     }
 }
+
+@Composable
+fun MeshPermissionWarningBanner(
+    onGrant: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onContinueAnyway: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .background(MeshColor.EmergencyRed.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, MeshColor.EmergencyRed.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Outlined.SignalWifiStatusbarConnectedNoInternet4,
+                contentDescription = null,
+                tint = MeshColor.EmergencyRed,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    "PERMISSIONS REQUIRED",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Black,
+                    color = MeshColor.EmergencyRed,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Pigeon needs Bluetooth and Location access to connect to the mesh. Without these, this node will remain isolated and unable to send or receive alerts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MeshColor.TextSecondary,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onGrant,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MeshColor.EmergencyRed)
+        ) {
+            Text(
+                "GRANT PERMISSIONS",
+                fontWeight = FontWeight.Black,
+                fontSize = 13.sp,
+                letterSpacing = 1.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        OutlinedButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.fillMaxWidth().height(40.dp),
+            shape = RoundedCornerShape(8.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MeshColor.TextSecondary)
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Open App Settings", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Continue without permissions →",
+            style = MaterialTheme.typography.labelSmall,
+            color = MeshColor.TextSecondary,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .clickable { onContinueAnyway() }
+                .padding(4.dp)
+        )
+    }
+}
+
+private fun getMeshPermissions(): Array<String> {
+    val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        permissions += listOf(
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_SCAN
+        )
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        permissions += Manifest.permission.NEARBY_WIFI_DEVICES
+    }
+    return permissions.toTypedArray()
+}
+
+private fun hasMeshPermissions(context: Context): Boolean =
+    getMeshPermissions().all {
+        checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }

@@ -127,10 +127,6 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(editedGender = gender) }
     }
 
-    fun onVerifiedToggle(isVerified: Boolean) {
-        _uiState.update { it.copy(editedIsVerified = isVerified) }
-    }
-
     fun onSaveClick() {
         _uiState.update { it.copy(showSaveConfirmation = true) }
     }
@@ -148,7 +144,7 @@ class ProfileViewModel @Inject constructor(
                 role = _uiState.value.editedRole,
                 isAnonymous = _uiState.value.editedIsAnonymous,
                 gender = _uiState.value.editedGender,
-                isVerified = _uiState.value.editedIsVerified,
+                isVerified = validUser.isVerified,
                 lastUpdatedTimestamp = System.currentTimeMillis() // This locks it
             )
             userRepository.saveUser(updatedUser)
@@ -156,15 +152,4 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun debugResetTimer() {
-        viewModelScope.launch {
-            userRepository.debugResetTimer()
-        }
-    }
-
-    fun debugLockProfile() {
-        viewModelScope.launch {
-            userRepository.debugLockProfile()
-        }
-    }
 }

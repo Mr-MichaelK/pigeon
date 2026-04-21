@@ -2,9 +2,11 @@ package com.example.pigeon.ui.screens.radar
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
-import android.widget.Toast
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -19,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
@@ -40,7 +41,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.pigeon.BuildConfig
 import com.example.pigeon.domain.model.ConnectionType
 import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
@@ -56,23 +56,20 @@ fun RadarScreen(
     val context = LocalContext.current
     
     // Permission Handling
-    var showPermissionDeniedDialog by remember { mutableStateOf(false) }
+    var showPermissionBanner by remember { mutableStateOf(!hasNearbyPermissions(context)) }
     var pendingPowerState by remember { mutableStateOf<MeshPowerState?>(null) }
-    
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         val allGranted = result.values.all { it }
         if (allGranted) {
+            showPermissionBanner = false
             pendingPowerState?.let { viewModel.setPowerState(it) }
             pendingPowerState = null
         } else {
-            showPermissionDeniedDialog = true
+            showPermissionBanner = true
         }
-    }
-
-    if (showPermissionDeniedDialog) {
-        PermissionDeniedDialog(onDismiss = { showPermissionDeniedDialog = false })
     }
 
     // Animation for the radar sweep
@@ -100,7 +97,7 @@ fun RadarScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             PowerStateToggle(
                 currentState = uiState.powerState,
                 onStateSelected = { state ->
@@ -112,34 +109,19 @@ fun RadarScreen(
                     }
                 }
             )
-            
-            if (BuildConfig.DEBUG) {
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedButton(
-                    onClick = {
-                        Toast.makeText(context, "Simulating Peer Discovery...", Toast.LENGTH_SHORT).show()
-                        viewModel.triggerDebugDiscovery()
-                    },
-                    modifier = Modifier.height(40.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MeshColor.Primary
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Primary),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.BugReport,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "DEBUG: SIMULATE PEER FOUND",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+
+            if (showPermissionBanner) {
+                Spacer(modifier = Modifier.height(12.dp))
+                RadarPermissionBanner(
+                    onGrant = { permissionLauncher.launch(getRequiredNearbyPermissions()) },
+                    onOpenSettings = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                        )
+                    }
+                )
             }
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -380,56 +362,75 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
 }
 
 @Composable
-fun PermissionDeniedDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MeshColor.Background,
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 8.dp,
-        icon = {
+fun RadarPermissionBanner(
+    onGrant: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MeshColor.EmergencyRed.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, MeshColor.EmergencyRed.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
             Icon(
                 imageVector = Icons.Default.Bluetooth,
                 contentDescription = null,
                 tint = MeshColor.EmergencyRed,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(18.dp)
             )
-        },
-        title = {
-            Text(
-                text = "COMMS LOCKOUT",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Black,
-                color = MeshColor.TextPrimary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        text = {
-            Text(
-                text = "The P2P Mesh requires Bluetooth and Location permissions to establish vital links. Without these, this node remains isolated.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MeshColor.TextSecondary,
-                lineHeight = 20.sp,
-                textAlign = TextAlign.Center
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MeshColor.Primary,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
                 Text(
-                    text = "UNDERSTOOD",
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    "NODE ISOLATED — PERMISSIONS MISSING",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    color = MeshColor.EmergencyRed,
+                    letterSpacing = 0.8.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Bluetooth and Location access are required to establish mesh links. This node cannot send or receive alerts until permissions are granted.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MeshColor.TextSecondary,
+                    lineHeight = 16.sp
                 )
             }
         }
-    )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onGrant,
+                modifier = Modifier.weight(1f).height(40.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MeshColor.EmergencyRed),
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                Text(
+                    "GRANT PERMISSIONS",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            OutlinedButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.height(40.dp),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MeshColor.Border),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeshColor.TextSecondary),
+                contentPadding = PaddingValues(horizontal = 12.dp)
+            ) {
+                Icon(Icons.Default.Menu, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Settings", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+    }
 }
 
 private fun getRequiredNearbyPermissions(): Array<String> {

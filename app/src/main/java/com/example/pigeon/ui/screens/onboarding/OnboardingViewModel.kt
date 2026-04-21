@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewModelScope
 import com.example.pigeon.domain.model.Gender
+import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.User
+import com.example.pigeon.domain.network.NearbySyncManager
 import com.example.pigeon.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +30,8 @@ data class OnboardingUiState(
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val nearbySyncManager: NearbySyncManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
@@ -80,6 +83,7 @@ class OnboardingViewModel @Inject constructor(
             )
             
             userRepository.saveUser(user)
+            nearbySyncManager.togglePowerState(MeshPowerState.PASSIVE, isSticky = true)
             _uiState.update { it.copy(isSaving = false, isProfileCreated = true) }
         }
     }
