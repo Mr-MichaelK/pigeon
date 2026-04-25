@@ -327,32 +327,12 @@ fun EventLogItem(
                         Spacer(modifier = Modifier.width(8.dp))
                         
                         if (!event.isResolved) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                distance?.let { d ->
-                                    Text(
-                                        text = if (d >= 1000) String.format("%.1fkm", d/1000) else String.format("%.0fm", d),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isWithinRadius) MeshColor.Primary.copy(alpha = 0.7f) else MeshColor.EmergencyRed.copy(alpha = 0.7f),
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    )
-                                }
-                                
-                                TextButton(
-                                    onClick = onResolve,
-                                    enabled = isWithinRadius,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.height(32.dp),
-                                    colors = ButtonDefaults.textButtonColors(
-                                        disabledContentColor = MeshColor.TextSecondary.copy(alpha = 0.5f)
-                                    )
-                                ) {
-                                    Text(
-                                        text = if (isWithinRadius) "MARK RESOLVED" else "TOO FAR",
-                                        color = if (isWithinRadius) MeshColor.Primary else MeshColor.TextPrimary.copy(alpha = 0.38f),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                            distance?.let { d ->
+                                Text(
+                                    text = if (d >= 1000) String.format("%.1fkm", d/1000) else String.format("%.0fm", d),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isWithinRadius) MeshColor.Primary.copy(alpha = 0.7f) else MeshColor.EmergencyRed.copy(alpha = 0.7f)
+                                )
                             }
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {

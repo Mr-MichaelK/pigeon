@@ -64,9 +64,20 @@ class MapViewModel @Inject constructor(
     val gpsAccuracy: StateFlow<Float?> = locationRepository.gpsAccuracy
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val locationQuality: StateFlow<com.example.pigeon.domain.model.LocationQuality> =
+        locationRepository.locationQuality
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.example.pigeon.domain.model.LocationQuality.NO_FIX
+            )
+
     val meshStatus: StateFlow<com.example.pigeon.domain.network.ConnectionStatus> = nearbySyncManager.status
+    val isLinking: StateFlow<Boolean> = nearbySyncManager.isLinking
+    val isWaveActive: StateFlow<Boolean> = nearbySyncManager.isWaveActive
+    val isSyncing: StateFlow<Boolean> = nearbySyncManager.isSyncing
     val peerCount: StateFlow<Int> = nearbySyncManager.nearbyPeers
-        .map { it.size }
+        .map { peers -> peers.distinctBy { it.callsign }.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

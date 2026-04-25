@@ -108,8 +108,31 @@ fun MapScreen(
     val canReport by reportViewModel.canReport.collectAsStateWithLifecycle()
     val cooldownTimeRemaining by reportViewModel.cooldownTimeRemaining.collectAsStateWithLifecycle()
     val meshStatus by viewModel.meshStatus.collectAsStateWithLifecycle()
+    val isLinking by viewModel.isLinking.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
     val peerCount by viewModel.peerCount.collectAsStateWithLifecycle()
     val gpsAccuracy by viewModel.gpsAccuracy.collectAsStateWithLifecycle()
+    val locationQuality by viewModel.locationQuality.collectAsStateWithLifecycle()
+    val hasGpsFix = uiState.userLocation != null
+
+    // Track how long we've been searching for a lock (resets when LOCKED)
+    var locatingStartMs by remember { mutableStateOf<Long?>(null) }
+    var locatingElapsedSec by remember { mutableIntStateOf(0) }
+    LaunchedEffect(locationQuality) {
+        if (locationQuality == com.example.pigeon.domain.model.LocationQuality.LOCKED) {
+            locatingStartMs = null
+            locatingElapsedSec = 0
+        } else if (locatingStartMs == null) {
+            locatingStartMs = System.currentTimeMillis()
+        }
+    }
+    LaunchedEffect(locatingStartMs) {
+        val start = locatingStartMs ?: return@LaunchedEffect
+        while (true) {
+            locatingElapsedSec = ((System.currentTimeMillis() - start) / 1000).toInt()
+            delay(1000)
+        }
+    }
 
     LaunchedEffect(Unit) {
         reportViewModel.reportError.collect { errorMsg ->
@@ -298,8 +321,13 @@ fun MapScreen(
             latitude = uiState.metadata.latitude,
             longitude = uiState.metadata.longitude,
             meshStatus = meshStatus,
+            isLinking = isLinking,
+            isSyncing = isSyncing,
             peerCount = peerCount,
             gpsAccuracy = gpsAccuracy,
+            hasGpsFix = hasGpsFix,
+            locationQuality = locationQuality,
+            locatingElapsedSec = locatingElapsedSec,
             onClick = onHeaderClick
         )
 
@@ -447,30 +475,54 @@ fun MeshHeader(
     latitude: Double,
     longitude: Double,
     meshStatus: com.example.pigeon.domain.network.ConnectionStatus,
+    isLinking: Boolean,
+    isSyncing: Boolean,
     peerCount: Int,
     gpsAccuracy: Float?,
+    hasGpsFix: Boolean,
+    locationQuality: com.example.pigeon.domain.model.LocationQuality,
+    locatingElapsedSec: Int,
     onClick: () -> Unit
 ) {
     val isTracking = meshStatus != com.example.pigeon.domain.network.ConnectionStatus.OFF
-    val statusColor = when (meshStatus) {
-        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Color(0xFF4ADE80)
-        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> MeshColor.Primary
-        com.example.pigeon.domain.network.ConnectionStatus.OFF -> Color.Gray
+
+    // isSyncing trumps the underlying mesh power state in the indicator. PASSIVE peers
+    // never run discovery, so their meshStatus reads "PASSIVE" the entire time an inbound
+    // sync is happening — without this override the user sees "ACCEPTING CONNECTIONS"
+    // even mid-handshake.
+    val statusColor = when {
+        isSyncing || isLinking -> Color(0xFF4ADE80)
+        meshStatus == com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Color(0xFF4ADE80)
+        meshStatus == com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> MeshColor.Primary
+        else -> Color.Gray
     }
 
-    val statusText = when (meshStatus) {
-        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> "SYNCING"
-        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> "SEARCHING"
-        com.example.pigeon.domain.network.ConnectionStatus.OFF -> "OFFLINE"
+    val statusText = when {
+        isSyncing -> "SYNCING WITH PEER"
+        isLinking -> "LINKING"
+        meshStatus == com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> "SCANNING"
+        meshStatus == com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> "ACCEPTING CONNECTIONS"
+        else -> "OFFLINE"
     }
 
-    val iconVector = when (meshStatus) {
-        com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Icons.Outlined.Sync
-        com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> Icons.Outlined.WifiTethering
-        com.example.pigeon.domain.network.ConnectionStatus.OFF -> Icons.Outlined.WifiTetheringOff
+    val iconVector = when {
+        isSyncing || isLinking -> Icons.Outlined.Sync
+        meshStatus == com.example.pigeon.domain.network.ConnectionStatus.ACTIVE -> Icons.Outlined.Sync
+        meshStatus == com.example.pigeon.domain.network.ConnectionStatus.PASSIVE -> Icons.Outlined.WifiTethering
+        else -> Icons.Outlined.WifiTetheringOff
     }
 
-    val isAcquiring = gpsAccuracy != null && gpsAccuracy > 100f
+    val isSpinning = isSyncing || isLinking || meshStatus == com.example.pigeon.domain.network.ConnectionStatus.ACTIVE
+    val isPulsing = meshStatus == com.example.pigeon.domain.network.ConnectionStatus.PASSIVE && !isLinking && !isSyncing
+
+    // Show the fix indicator whenever we aren't fully locked
+    val showFixIndicator = locationQuality != com.example.pigeon.domain.model.LocationQuality.LOCKED
+    val isNoFix = locationQuality == com.example.pigeon.domain.model.LocationQuality.NO_FIX
+    val fixIndicatorColor = when (locationQuality) {
+        com.example.pigeon.domain.model.LocationQuality.LOCKED -> Color(0xFF4ADE80)
+        com.example.pigeon.domain.model.LocationQuality.COARSE -> MeshColor.AlertOrange
+        com.example.pigeon.domain.model.LocationQuality.NO_FIX -> MeshColor.AlertOrange
+    }
 
     // Always declared so composable call order is stable
     val gpsTransition = rememberInfiniteTransition(label = "GpsAcquiringAnim")
@@ -504,7 +556,12 @@ fun MeshHeader(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // Left: Coordinates Section
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     val latStr = String.format("%.5f", latitude)
                     val lonStr = String.format("%.5f", longitude)
 
@@ -521,27 +578,19 @@ fun MeshHeader(
                             "$latStr, $lonStr",
                             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                             fontWeight = FontWeight.Bold,
-                            color = MeshColor.TextPrimary
+                            color = MeshColor.TextPrimary,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
-                        if (isAcquiring) {
-                            Spacer(modifier = Modifier.height(3.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(5.dp)
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .background(MeshColor.AlertOrange.copy(alpha = gpsAlpha))
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    "ACQUIRING · ${gpsAccuracy!!.toInt()}m",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MeshColor.AlertOrange.copy(alpha = gpsAlpha),
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
+                        if (showFixIndicator) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LocatingProgressIndicator(
+                                accuracyMeters = gpsAccuracy,
+                                elapsedSec = locatingElapsedSec,
+                                isNoFix = isNoFix,
+                                tint = fixIndicatorColor,
+                                pulseAlpha = gpsAlpha
+                            )
                         }
                     }
                 }
@@ -612,20 +661,88 @@ fun MeshHeader(
                             Icon(
                                 imageVector = iconVector,
                                 contentDescription = "Mesh Status",
-                                tint = statusColor.copy(alpha = if (meshStatus == com.example.pigeon.domain.network.ConnectionStatus.PASSIVE) pulseAlpha else 1f),
+                                tint = statusColor.copy(alpha = if (isPulsing) pulseAlpha else 1f),
                                 modifier = Modifier
                                     .padding(8.dp)
-                                    .run {
-                                        if (meshStatus == com.example.pigeon.domain.network.ConnectionStatus.ACTIVE) {
-                                            this.rotate(rotation)
-                                        } else this
-                                    }
+                                    .run { if (isSpinning) this.rotate(rotation) else this }
                             )
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LocatingProgressIndicator(
+    accuracyMeters: Float?,
+    elapsedSec: Int,
+    isNoFix: Boolean,
+    tint: Color,
+    pulseAlpha: Float
+) {
+    // Accuracy-derived progress. GPS accuracy genuinely improves as more
+    // satellites lock and ephemeris data downloads, so this is honest progress.
+    // 500m -> 6%, 200m -> 15%, 100m -> 30%, 50m -> 60%, 30m -> 100%.
+    val progress: Float? = accuracyMeters?.let { acc ->
+        if (acc <= 30f) 1f else (30f / acc).coerceIn(0.05f, 1f)
+    }
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress ?: 0f,
+        animationSpec = tween(durationMillis = 600, easing = LinearEasing),
+        label = "LocatingProgress"
+    )
+
+    val mins = elapsedSec / 60
+    val secs = elapsedSec % 60
+    val timeLabel = if (mins > 0) "${mins}m ${secs}s" else "${secs}s"
+    val label = when {
+        isNoFix && accuracyMeters == null -> "LOCATING · $timeLabel"
+        isNoFix -> "LOCATING · $timeLabel · ${accuracyMeters!!.toInt()}m"
+        else -> "COARSE GPS · $timeLabel · ${accuracyMeters?.toInt() ?: 0}m"
+    }
+    val dotAlpha = if (isNoFix && progress == null) pulseAlpha else 1f
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = dotAlpha))
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = tint.copy(alpha = dotAlpha),
+            letterSpacing = 0.5.sp
+        )
+    }
+
+    Spacer(modifier = Modifier.height(3.dp))
+
+    val barModifier = Modifier
+        .fillMaxWidth(0.65f)
+        .height(3.dp)
+        .clip(RoundedCornerShape(1.5.dp))
+
+    // Determinate when we have accuracy, Material3 indeterminate shimmer otherwise
+    if (progress != null) {
+        LinearProgressIndicator(
+            progress = { animatedProgress },
+            modifier = barModifier,
+            color = tint,
+            trackColor = tint.copy(alpha = 0.15f)
+        )
+    } else {
+        LinearProgressIndicator(
+            modifier = barModifier,
+            color = tint,
+            trackColor = tint.copy(alpha = 0.15f)
+        )
     }
 }
 

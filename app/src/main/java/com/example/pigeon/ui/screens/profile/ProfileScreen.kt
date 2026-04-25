@@ -45,17 +45,10 @@ fun ProfileScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp, end = 16.dp)
+                .padding(horizontal = 16.dp)
                 .padding(top = 16.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MeshColor.TextPrimary
-                )
-            }
             Text(
                 text = "IDENTITY PROFILE",
                 style = MaterialTheme.typography.titleMedium,
