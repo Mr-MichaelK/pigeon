@@ -531,7 +531,7 @@ class NearbySyncManagerImpl @Inject constructor(
             Log.i(TAG, "Radio soft-reset complete. Restarting (state=$currentPowerState)...")
             when (currentPowerState) {
                 MeshPowerState.ACTIVE -> startDutyCycle(getDutyCycleInterval())
-                MeshPowerState.PASSIVE -> startAdvertising(lowPower = true)
+                MeshPowerState.PASSIVE -> startAdvertising(lowPower = false)
                 MeshPowerState.OFF -> { }
             }
         }
@@ -931,10 +931,17 @@ class NearbySyncManagerImpl @Inject constructor(
             }
             MeshPowerState.PASSIVE -> {
                 // Single-role advertising never triggers 8007 — no duty cycle needed.
-                Log.d(TAG, "Power PASSIVE. Starting low-power Advertising only.")
+                // Use normal-power advertising (lowPower=false). The ~1280 ms BLE ad
+                // interval that lowPower=true imposes leaves the GATT server too
+                // sluggish to answer connection requests reliably — discovery worked,
+                // but inbound requestConnection from an ACTIVE peer would time out
+                // (~32 s) and fail with STATUS_RADIO_ERROR (8007). Normal-power's
+                // ~158 ms interval keeps the channel responsive enough for the
+                // ACTIVE peer's CONNECT to land. Battery cost is in the milliwatts.
+                Log.d(TAG, "Power PASSIVE. Starting Advertising only (normal power).")
                 _status.value = ConnectionStatus.PASSIVE
                 stopDutyCycle()
-                startAdvertising(lowPower = true)
+                startAdvertising(lowPower = false)
             }
             MeshPowerState.OFF -> {
                 Log.d(TAG, "Power OFF. Quiet mode engaged.")
@@ -1046,7 +1053,8 @@ class NearbySyncManagerImpl @Inject constructor(
         Log.d(TAG, "Broadcasting Verification: ${verification.id} for event ${verification.eventId}")
         val payload = PigeonPayload.newBuilder().setVerification(verification).build()
         val bytes = Payload.fromBytes(payload.toByteArray())
-        _nearbyPeers.value.filter { it.isConnected }.forEach { peer ->
+        val reachablePeers = _nearbyPeers.value.filter { it.isConnected }
+        reachablePeers.forEach { peer ->
             if (peer.deviceId != MOCK_PEER_ID) {
                 connectionsClient.sendPayload(peer.deviceId, bytes)
             }
@@ -1055,6 +1063,13 @@ class NearbySyncManagerImpl @Inject constructor(
         if (recentlySyncedPeers.isNotEmpty()) {
             recentlySyncedPeers.clear()
         }
+        // Wake the radio. Unlike broadcastIncident — whose caller (ReportViewModel) already
+        // toggles sticky-ACTIVE before broadcasting — verifyEvent does NOT touch power state.
+        // Without this wave, a verification created on a PASSIVE device just sits in the
+        // local DB forever: PASSIVE never discovers, so the next manifest exchange (which
+        // is what actually carries verifications) never happens. The wave gives us a 60 s
+        // ACTIVE window that's plenty to find a peer and push the verification.
+        startProximityWave()
     }
 
     override fun startProximityWave() {

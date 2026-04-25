@@ -80,7 +80,7 @@ class LocationRepositoryImpl @Inject constructor(
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 _gpsAccuracy.value = location.accuracy
                 _userLocation.value = LatLng(location.latitude, location.longitude)
-                _locationQuality.value = classify(location.accuracy)
+                _locationQuality.value = classify(location.accuracy, _locationQuality.value)
             }
         }
 
@@ -144,7 +144,7 @@ class LocationRepositoryImpl @Inject constructor(
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 lastValidFusedElapsed = SystemClock.elapsedRealtime()
                 _userLocation.value = LatLng(location.latitude, location.longitude)
-                _locationQuality.value = classify(location.accuracy)
+                _locationQuality.value = classify(location.accuracy, _locationQuality.value)
             }
         }
 
@@ -176,7 +176,7 @@ class LocationRepositoryImpl @Inject constructor(
                 Log.d(TAG, "GPS fallback accepted — fused silent ${fusedSilentMs}ms, acc=${location.accuracy}m")
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 _userLocation.value = LatLng(location.latitude, location.longitude)
-                _locationQuality.value = classify(location.accuracy)
+                _locationQuality.value = classify(location.accuracy, _locationQuality.value)
             }
         }
 
@@ -223,10 +223,28 @@ class LocationRepositoryImpl @Inject constructor(
         return location.accuracy <= FIX_MAX_ACCURACY_M && ageMs in 0..FIX_MAX_AGE_MS
     }
 
-    private fun classify(accuracyMeters: Float): LocationQuality = when {
-        accuracyMeters <= LOCKED_THRESHOLD_M -> LocationQuality.LOCKED
-        accuracyMeters <= FIX_MAX_ACCURACY_M -> LocationQuality.COARSE
-        else -> LocationQuality.NO_FIX
+    /**
+     * Classify with hysteresis around the LOCKED↔COARSE boundary.
+     *
+     * The Helio G85's fused provider hovers around the 15 m mark while stationary
+     * with a clear sky, sending fixes that bounce 13 m → 17 m → 14 m → 18 m. Without
+     * hysteresis the UI quality indicator flickers LOCKED↔COARSE every few seconds.
+     *
+     * Rule: enter LOCKED only when accuracy ≤ LOCKED_THRESHOLD_M (15 m). Once LOCKED,
+     * stay LOCKED until accuracy degrades past LOCKED_RELEASE_M (25 m). NO_FIX exit
+     * also requires the strict 15 m gate so a stale-fallback coarse fix doesn't
+     * "promote" the device into LOCKED on first acceptance.
+     */
+    private fun classify(accuracyMeters: Float, current: LocationQuality): LocationQuality {
+        if (accuracyMeters > FIX_MAX_ACCURACY_M) return LocationQuality.NO_FIX
+        return when (current) {
+            LocationQuality.LOCKED ->
+                if (accuracyMeters <= LOCKED_RELEASE_M) LocationQuality.LOCKED
+                else LocationQuality.COARSE
+            else ->
+                if (accuracyMeters <= LOCKED_THRESHOLD_M) LocationQuality.LOCKED
+                else LocationQuality.COARSE
+        }
     }
 
     private fun hasLocationPermission(): Boolean =
@@ -252,9 +270,12 @@ class LocationRepositoryImpl @Inject constructor(
         // rather than leaving the user with a frozen/missing location dot.
         private const val STALE_LOCATION_TIMEOUT_MS = 10_000L
 
-        // Quality classification thresholds.
-        // LOCKED requires genuine GPS quality (≤15 m); anything between 15–75 m
-        // is COARSE (marginal GPS or stale-fallback network fix).
+        // Quality classification thresholds (hysteresis).
+        // Enter LOCKED only when accuracy ≤ LOCKED_THRESHOLD_M (15 m).
+        // Once LOCKED, stay LOCKED until accuracy degrades past LOCKED_RELEASE_M
+        // (25 m) — the 10 m gap absorbs the natural ±3-5 m wobble of the Helio
+        // G85 GPS chipset and prevents the visible LOCKED↔COARSE flicker.
         private const val LOCKED_THRESHOLD_M = 15f
+        private const val LOCKED_RELEASE_M = 25f
     }
 }
