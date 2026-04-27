@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.pigeon.data.worker.PurgeWorker
+import com.example.pigeon.util.FileLogger
 import dagger.hilt.android.HiltAndroidApp
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -24,6 +25,9 @@ class PigeonApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Capture this process's logcat to a file before anything else logs, so we
+        // don't lose the early-startup lines that surround Hilt/MapLibre init.
+        FileLogger.init(this)
         org.maplibre.android.MapLibre.getInstance(this)
         schedulePurgeWorker()
     }

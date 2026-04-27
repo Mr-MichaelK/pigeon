@@ -4,8 +4,10 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -46,9 +48,13 @@ fun EventDetailSheet(
         containerColor = MeshColor.Background,
         dragHandle = { BottomSheetDefaults.DragHandle(color = MeshColor.Border) }
     ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val sheetMaxHeight = maxHeight * 0.65f
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = sheetMaxHeight)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 40.dp)
         ) {
@@ -201,7 +207,7 @@ fun EventDetailSheet(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetadataPill(
                         icon = Icons.Outlined.Dns,
-                        label = "ORIGIN",
+                        label = "PEER ID",
                         value = event.creatorDeviceId.take(8).uppercase(),
                         modifier = Modifier.weight(1f)
                     )
@@ -353,6 +359,7 @@ fun EventDetailSheet(
                     Text("CLOSE DETAILS", fontWeight = FontWeight.Bold, color = MeshColor.TextSecondary)
                 }
             }
+        }
         }
     }
 }

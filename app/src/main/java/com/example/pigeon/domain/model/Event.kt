@@ -17,7 +17,9 @@ data class Event(
     val longitude: Double,
     val timestamp: Long,
     val isResolved: Boolean,
-    val ttl: Long
+    val creatorName: String,
+    val ttl: Long,
+    val expiryTimestamp: Long
 ) {
     /**
      * Checks if this event is within a specific radius of a LatLng coordinate.

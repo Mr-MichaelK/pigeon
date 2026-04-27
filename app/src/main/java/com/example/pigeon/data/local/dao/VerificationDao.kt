@@ -21,4 +21,7 @@ interface VerificationDao {
 
     @Query("DELETE FROM verifications WHERE eventId = :eventId")
     suspend fun deleteVerificationsForEvent(eventId: String)
+
+    @Query("SELECT * FROM verifications")
+    suspend fun getAllVerifications(): List<VerificationEntity>
 }

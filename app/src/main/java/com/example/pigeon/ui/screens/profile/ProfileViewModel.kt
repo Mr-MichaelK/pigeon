@@ -2,6 +2,7 @@ package com.example.pigeon.ui.screens.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.domain.model.User
 import com.example.pigeon.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,9 +19,14 @@ data class ProfileUiState(
     val isLocked: Boolean = false,
     val canEdit: Boolean = false,
     // Draft state for editing
+    val editedDisplayName: String = "",
     val editedRole: String = "",
     val editedIsAnonymous: Boolean = false,
-    val isSaving: Boolean = false
+    val editedGender: Gender = Gender.UNDISCLOSED,
+    val editedIsVerified: Boolean = false,
+    val defaultAvatarName: String = "avatar_male",
+    val isSaving: Boolean = false,
+    val showSaveConfirmation: Boolean = false
 )
 
 @HiltViewModel
@@ -40,12 +46,20 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             userRepository.getUser().collect { user ->
                 val isLocked = userRepository.isProfileLocked()
+                
+                val currentGender = user?.gender ?: Gender.UNDISCLOSED
+                val defaultAvatarName = if (currentGender == Gender.FEMALE) "avatar_female" else "avatar_male"
+                
                 _uiState.update { 
                     it.copy(
                         user = user, 
                         // Initialize draft state if not already set or if user changed
+                        editedDisplayName = if (it.editedDisplayName.isBlank()) user?.displayName ?: "" else it.editedDisplayName,
                         editedRole = if (it.editedRole.isBlank()) user?.role ?: "Civilian" else it.editedRole,
                         editedIsAnonymous = user?.isAnonymous ?: false,
+                        editedGender = currentGender,
+                        editedIsVerified = user?.isVerified ?: false,
+                        defaultAvatarName = defaultAvatarName,
                         isLoading = false,
                         isLocked = isLocked,
                         canEdit = !isLocked
@@ -97,6 +111,10 @@ class ProfileViewModel @Inject constructor(
         return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
 
+    fun onDisplayNameChange(name: String) {
+        _uiState.update { it.copy(editedDisplayName = name) }
+    }
+
     fun onRoleChange(role: String) {
         _uiState.update { it.copy(editedRole = role) }
     }
@@ -105,13 +123,28 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(editedIsAnonymous = isAnonymous) }
     }
 
+    fun onGenderChange(gender: Gender) {
+        _uiState.update { it.copy(editedGender = gender) }
+    }
+
+    fun onSaveClick() {
+        _uiState.update { it.copy(showSaveConfirmation = true) }
+    }
+
+    fun dismissSaveConfirmation() {
+        _uiState.update { it.copy(showSaveConfirmation = false) }
+    }
+
     fun saveAndLockIdentity() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
+            _uiState.update { it.copy(showSaveConfirmation = false, isSaving = true) }
             val validUser = _uiState.value.user ?: return@launch
             val updatedUser = validUser.copy(
+                displayName = _uiState.value.editedDisplayName,
                 role = _uiState.value.editedRole,
                 isAnonymous = _uiState.value.editedIsAnonymous,
+                gender = _uiState.value.editedGender,
+                isVerified = validUser.isVerified,
                 lastUpdatedTimestamp = System.currentTimeMillis() // This locks it
             )
             userRepository.saveUser(updatedUser)
@@ -119,9 +152,4 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun debugResetTimer() {
-        viewModelScope.launch {
-            userRepository.debugResetTimer()
-        }
-    }
 }

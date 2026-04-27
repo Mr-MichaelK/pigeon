@@ -163,3 +163,57 @@
 *   **Mesh Propagation**: Integrated `VerificationMessage` into the P2P protocol, enabling real-time trust synchronization across all connected nodes.
 *   **Reactive Pins**: Updated MapLibre symbol management to visually distinguish between unverified (40% alpha) and verified (100% alpha) incident markers, improving situational awareness.
 
+## 🟡 PHASE 7: Onboarding & Identity Refinement (IN PROGRESS)
+### Task 7.1: Expanded Identity Schema (Gender & Logic)
+- [x] **Architect:** Update the UserProfile Room Entity to include gender (Enum: MALE, FEMALE, UNDISCLOSED) and nodeId (UUID).
+- [x] **Coder:** Implement a ProfileViewModel logic that reactively switches the default avatar: if gender == MALE set to avatar_male, else avatar_female. Default to avatar_male for UNDISCLOSED.
+- [x] **Reviewer:** Verify that the 72-hour lock correctly prevents gender/name flipping after the initial "Join Mesh" action.
+
+### Task 7.2: UX/UI Cleanup & Placeholder Polish
+- [x] **Coder:** Replace the "Alpha One" placeholder in the Display Name field with a context-neutral hint (e.g., "John Doe").
+- [x] **Coder:** Remove the fixed, non-functional countdown timer from the Onboarding screen to reduce visual clutter for first-time users.
+- [x] **Reviewer:** Audit the "Rugged/Utility" high-contrast colors for the new Gender selection radio-group/tabs.
+
+### Task 7.3: Anonymous Mode & Privacy Indicators
+- [x] **Architect:** Define the "Privacy Toggle" behavior—Anonymous mode should nullify the displayName in the broadcast payload but keep it in the local DB.
+- [x] **Coder:** Implement a dynamic "Privacy Hint" beneath the name input: "Your name will be hidden; you will appear as 'Anonymous Civilian' to the mesh" when toggled ON.
+- [x] **Reviewer:** Ensure the "Rugged" aesthetic is maintained—use a warning-style yellow/amber for the privacy indicator.
+
+### Task 7.4: Automated Node Identity
+- [x] **Architect:** Define the nodeId generation strategy: A unique, persistent String derived from a random UUID or Settings.Secure.ANDROID_ID.
+- [x] **Coder:** Implement the auto-generation logic so the "Device Node Name" field is populated on first boot and set to read-only in the UI.
+- [x] **Reviewer:** Confirm that the generated ID is short enough to be readable on the Radar and Peer List screens.
+
+### Task 7.5: Role Purge & Verification State
+- [x] **Architect:** Remove all references to the "Coordinator" role from the codebase, Enums, and UI layouts.
+- [x] **Coder:** Implement conditional visibility for the "Verified Node" badge: Visibility = GONE by default. It must only appear if the local isVerified flag is true (post-threshold syncs).
+- [x] **Coder:** Finalize the 4-Grid Role Selector: [Civilian, First Responder, Scout, Utility/Tech].
+- [x] **Reviewer:** Perform a full "Onboarding-to-Map" walkthrough to ensure the transition is seamless and the "Rugged" UI feels cohesive.
+
+## 🔴 PHASE 8: Profile Screen Refinement (FUTURE)
+### Task 8.1: Unified "Tactical ID" Layout
+- [x] **Architect:** Design the Profile Screen to mirror the Onboarding UI's 2-card role selector and gender-based avatar system for visual consistency.
+- [x] **Coder:** Implement a Header Section featuring the large circular avatar (Auto-switched by Gender) and the nodeId (Device Name) as a permanent, non-editable subtitle.
+- [x] **Reviewer:** Ensure the "Verified Node" badge is only visible if the user's isVerified flag is true in the Room DB.
+
+### Task 8.2: Identity Lock & Edit Logic
+- [x] **Architect:** Implement the "Dual-State" form: Fields are Enabled only if the 72-hour lockout period has expired.
+- [x] **Coder:** Build the Countdown Timer Overlay for the Profile screen. If a lock is active, the "Edit" button is replaced by a live HH:MM:SS timer.
+- [x] **Coder:** Implement the "Save & Lock" confirmation modal. Clicking this must update the last_edit_timestamp in the UserProfile table.
+- [x] **Reviewer:** Verify that the "Anonymous Mode" toggle remains accessible and provides the same "Privacy Hint" found in Onboarding.
+
+### Task 8.3: Summary & Metadata Display
+- [x] **Coder:** Add a "Mesh Statistics" section (Read-Only) showing:
+    - Total Syncs: Count of successful Set Union exchanges.
+    - Trust Score: The calculated Reputation percentage from Phase 6.
+    - Operational Role: Displayed as a high-contrast "Tactical Badge" based on the selected role (Civilian, First Responder, Scout, Utility).
+- [x] **Reviewer:** Audit the spacing and touch targets (min 48dp) to ensure the screen is navigable under stress (e.g., wearing gloves or in low light).
+
+### Task 8.4: Data Flow & Repository Sync
+- [x] **Architect**: Ensure the ProfileViewModel is a single source of truth for both the Onboarding and Profile screens.
+- [x] **Coder**: Implement a reactive Navigation Drawer that broadcasts identity updates across all screens (Map, Radar, Log).
+- [x] **Reviewer**: Confirm that changing the Gender/Name in Profile instantly updates the Drawer Header across the entire app.
+
+### Task 8.5: Visual Refinement
+- [] **Coder**: Apply the "Rugged" styling: Use monospaced fonts for technical IDs, heavy borders for the role-selection cards, and high-contrast "Safety Orange" or "Signal Green" for active buttons.
+- [] **Reviewer**: Audit the "Anonymous Mode" visual indicator—ensure it is prominent enough that a user knows their identity is hidden before they broadcast a new report.

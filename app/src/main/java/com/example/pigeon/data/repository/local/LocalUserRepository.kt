@@ -1,10 +1,13 @@
 package com.example.pigeon.data.repository.local
 
+import android.content.Context
+import android.provider.Settings
 import com.example.pigeon.data.local.dao.UserDao
 import com.example.pigeon.data.local.entities.toDomain
 import com.example.pigeon.data.local.entities.toEntity
 import com.example.pigeon.domain.model.User
 import com.example.pigeon.domain.repository.UserRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -15,7 +18,8 @@ import javax.inject.Inject
  * Implementation of UserRepository using Room local storage.
  */
 class LocalUserRepository @Inject constructor(
-    private val userDao: UserDao
+    private val userDao: UserDao,
+    @ApplicationContext private val context: Context
 ) : UserRepository {
 
     override fun getUser(): Flow<User?> {
@@ -32,8 +36,16 @@ class LocalUserRepository @Inject constructor(
             existingUser!!.nodeName
         }
 
+        // Ensure nodeId is immutable once generated (Task 7.4)
+        val finalNodeId = if (existingUser?.nodeId.isNullOrEmpty()) {
+            UUID.randomUUID().toString()
+        } else {
+            existingUser!!.nodeId
+        }
+
         val userWithMetadata = user.copy(
             nodeName = finalNodeName,
+            nodeId = finalNodeId,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
         
@@ -49,15 +61,27 @@ class LocalUserRepository @Inject constructor(
         return difference < seventyTwoHoursInMillis
     }
 
-    override suspend fun debugResetTimer() {
-        val user = userDao.getUserSync() ?: return
-        // Set timestamp to 73 hours ago to ensure it's unlocked
-        val seventyThreeHoursAgo = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(73)
-        userDao.upsertUser(user.copy(lastUpdatedTimestamp = seventyThreeHoursAgo))
+    override suspend fun incrementSyncCount() {
+        userDao.incrementSyncCount()
+    }
+
+    override suspend fun updateTrustScore(score: Float) {
+        userDao.updateTrustScore(score)
+    }
+
+    override suspend fun getOrGenerateNodeName(): String {
+        val existing = userDao.getUserSync()
+        return if (existing?.nodeName.isNullOrEmpty()) {
+            generateNodeName()
+        } else {
+            existing!!.nodeName
+        }
     }
 
     private fun generateNodeName(): String {
-        // Generate a rugged-style node name hash
-        return "NODE-${UUID.randomUUID().toString().take(8).uppercase()}"
+        // Generate a deterministic node name based on ANDROID_ID (Task 7.4)
+        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        val hash = androidId?.take(8)?.uppercase() ?: UUID.randomUUID().toString().take(8).uppercase()
+        return "NODE-$hash"
     }
 }

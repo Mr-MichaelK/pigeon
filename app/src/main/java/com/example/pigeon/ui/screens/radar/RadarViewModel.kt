@@ -2,6 +2,7 @@ package com.example.pigeon.ui.screens.radar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pigeon.data.service.MeshServiceController
 import com.example.pigeon.domain.model.ConnectionType
 import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
@@ -25,7 +26,8 @@ data class RadarUiState(
 
 @HiltViewModel
 class RadarViewModel @Inject constructor(
-    private val nearbySyncManager: NearbySyncManager
+    private val nearbySyncManager: NearbySyncManager,
+    private val meshController: MeshServiceController
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RadarUiState())
@@ -54,16 +56,13 @@ class RadarViewModel @Inject constructor(
     }
 
     fun setPowerState(state: MeshPowerState) {
-        // We only call the manager; the UI will sync via the status Flow collected in init {}
-        nearbySyncManager.togglePowerState(state, isSticky = true)
+        // Power-state changes go through the service so the radio's lifetime is
+        // owned by a foreground component (survives Doze and backgrounding).
+        // The UI still observes nearbySyncManager.status for state syncing.
+        meshController.setPowerState(state, isSticky = true)
     }
 
     fun triggerDebugDiscovery() {
         nearbySyncManager.simulateNearbyPeerFound()
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        nearbySyncManager.stop()
     }
 }

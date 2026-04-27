@@ -1,84 +1,27 @@
-# PLAN.md — Task 6.3: "Quick Glance" Map UI
+# Implementing Proximity Radius Visualizer
 
 ## Objective
-Make map pins visually distinguish Verified vs. Unverified events at a glance.
+Implement a reactive 500m GeoJSON circle rendering around the user's GPS coordinates, ensuring correct styling and Z-index layering.
 
----
+## Proposed Strategy
 
-## Key Constraint: SymbolManager Bitmap Architecture
+### 1. Geometry Generation
+- **File:** `MapScreen.kt` or `LocationUtils.kt`
+- Add a helper function `createGeoJsonCircle(center: LatLng, radiusInMeters: Double, points: Int = 64): Polygon`.
+- It will calculate the Earth's curvature math (Haversine/Spherical) to plot 64 boundary points around the user.
 
-The app renders pins as **pre-rasterized Bitmaps** added to the MapLibre style (`style.addImage()`)
-and drawn via `SymbolManager`. Per-symbol opacity is NOT natively supported through the annotations
-plugin — it only provides `withIconSize()`, `withIconImage()`, etc.
+### 2. Layer & Style Registration
+- **File:** `MapScreen.kt` (in `setupMapStyle` block)
+- Modify the existing `"proximity-layer"`.
+- Replace the current gold visualizer with two new layers:
+  - `proximity-fill-layer` (FillLayer): Color `#00FF00` at `0.10` alpha.
+  - `proximity-line-layer` (LineLayer): Color `#00FF00` at `0.50` alpha, width `2f`.
+- Append both to the style *before* `SymbolManager` initialization to prevent them from intercepting pin clicks.
 
-**Solution:**
-For each event type, pre-render **two** bitmap variants at style setup time:
-- **`pin-{type}`** — Full opacity (verified / high trust)
-- **`pin-{type}-faded`** — `alpha = 0.4` (unverified / low trust)
+### 3. Reactive State Updates
+- **File:** `MapScreen.kt`
+- Add a `LaunchedEffect(uiState.userLoc)` that recalculates the `Polygon` using the helper function.
+- Fetch the `"proximity-source"` as `GeoJsonSource` and update it dynamically via `source.geometry(Feature.fromGeometry(polygon))`.
+- MapLibre will natively handle redrawing the new circle bounds smoothly.
 
-At symbol creation time in `updateSymbols()`, pick the correct image key based on the event's
-current `TrustScore.isVerified` flag. When trust data updates (DB → Flow → ViewModel), trigger
-`updateSymbols()` again, which redraws all pins.
-
----
-
-## Architecture: Trust Data Flow to Map
-
-### Problem
-`updateSymbols()` runs outside Compose — it's a private Kotlin function called from a
-`LaunchedEffect`. It cannot directly consume a `StateFlow` inside `LaunchedEffect` easily when
-mixing with `uiState`.
-
-### Solution: Embed trust scores in `MapUiState`
-
-1. **`MapViewModel`**: Inject `VerificationRepository`. Build a new combined flow that maps
-   each event to its `TrustScore`, emitting `Map<String, TrustScore>` (keyed by `eventId`).
-   Add `val trustScores: Map<String, TrustScore>` to `MapUiState`.
-
-2. **`MapScreen.kt` `LaunchedEffect`**: React to both `uiState.events` AND `uiState.trustScores`
-   changes to re-invoke `updateSymbols()`.
-
-3. **`updateSymbols()`**: Add `trustScores: Map<String, TrustScore>` parameter.
-   Inside the function, look up each event's trust score and pick `pin-{type}` or `pin-{type}-faded`.
-
----
-
-## Bitmap Rendering: Faded Variant
-
-A helper `createFadedPinBitmap(bitmap: Bitmap, alpha: Int): Bitmap` applies pixel-level alpha
-multiplication to create the 40% opacity version without a second drawable inflate:
-
-```kotlin
-private fun createFadedBitmap(src: Bitmap, alpha: Int): Bitmap {
-    val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(out)
-    val paint = Paint().apply { this.alpha = alpha }  // 102 ≈ 0.4 * 255
-    canvas.drawBitmap(src, 0f, 0f, paint)
-    return out
-}
-```
-
----
-
-## Layer Ordering
-
-The proximity circle layer (`proximity-layer`) is already added via `style.addLayer()` BEFORE
-symbols are created by `SymbolManager`. The `SymbolManager` always adds its layer on top.
-**No changes needed for layer ordering.**
-
----
-
-## Files to Modify
-
-| Action   | File                                               |
-|----------|----------------------------------------------------|
-| [MODIFY] | `ui/screens/map/MapViewModel.kt` — add trust flow to `MapUiState` |
-| [MODIFY] | `ui/screens/map/MapScreen.kt` — faded bitmap registration, `LaunchedEffect` trigger, `updateSymbols` signature update |
-
----
-
-## Verification Plan
-1. `./gradlew assembleDebug` — zero errors
-2. Events with 0 verifications appear faded (40% opacity)
-3. Events after 3+ confirms at >= 80% appear at full opacity
-4. Proximity circle remains below all pins
+I'll wait for your permission (Proceed / Plan approved) to implement this.

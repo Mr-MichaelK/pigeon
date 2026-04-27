@@ -5,9 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,15 +19,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pigeon.R
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.ui.theme.MeshColor
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +82,8 @@ fun ReportingWizardSheet(
                     selectedTtl = selectedTtlHours,
                     onTtlChange = { selectedTtlHours = it },
                     onConfirm = {
-                        onReport(selectedType!!, title, description, selectedTtlHours)
+                        val finalTtl = minOf(selectedTtlHours, 168L)
+                        onReport(selectedType!!, title, description, finalTtl)
                         onDismiss()
                     },
                     onBack = { stage = 1 }
@@ -304,20 +315,14 @@ private fun StageTwo(
         fontWeight = FontWeight.Bold,
         color = MeshColor.TextSecondary
     )
-    
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        listOf(1L, 6L, 24L).forEach { hours ->
-            FilterChip(
-                selected = selectedTtl == hours,
-                onClick = { onTtlChange(hours) },
-                label = { Text("${hours}h") },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // Precision TTL Wheel Picker
+    TtlWheelPicker(
+        totalHours = selectedTtl,
+        onTotalHoursChanged = onTtlChange
+    )
 
     Spacer(modifier = Modifier.height(32.dp))
 
@@ -340,6 +345,241 @@ private fun StageTwo(
             )
         ) {
             Text("CONFIRM REPORT", fontWeight = FontWeight.Black, color = Color.White)
+        }
+    }
+}
+
+// ── Precision TTL Wheel Picker ─────────────────────────────────────────────
+
+@Composable
+private fun TtlWheelPicker(
+    totalHours: Long,
+    onTotalHoursChanged: (Long) -> Unit
+) {
+    val initialDays = (totalHours / 24).toInt().coerceIn(0, 7)
+    val initialHours = (totalHours % 24).toInt().coerceIn(0, 23)
+
+    var selectedDays by remember { mutableIntStateOf(initialDays) }
+    var selectedHours by remember { mutableIntStateOf(initialHours) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Constraint enforcement
+    LaunchedEffect(selectedDays, selectedHours) {
+        var days = selectedDays
+        var hours = selectedHours
+
+        if (days >= 7) {
+            days = 7
+            hours = 0
+        }
+        if (days == 0 && hours < 1) {
+            hours = 1
+        }
+
+        if (days != selectedDays) selectedDays = days
+        if (hours != selectedHours) selectedHours = hours
+
+        val total = (days * 24L) + hours
+        onTotalHoursChanged(total.coerceIn(1, 168))
+    }
+
+    Surface(
+        color = MeshColor.Surface,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MeshColor.Border),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Days Column
+                WheelColumn(
+                    label = "DAYS",
+                    range = 0..7,
+                    selectedValue = selectedDays,
+                    onValueChanged = { selectedDays = it },
+                    displayTransform = { "$it" },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Separator
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(140.dp)
+                        .background(MeshColor.Border)
+                        .align(Alignment.CenterVertically)
+                )
+
+                // Hours Column
+                WheelColumn(
+                    label = "HOURS",
+                    range = if (selectedDays >= 7) 0..0 else 0..23,
+                    selectedValue = selectedHours,
+                    onValueChanged = { selectedHours = it },
+                    displayTransform = { "$it" },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MeshColor.Border
+            )
+
+            // Expiry Preview
+            val expiryMillis = System.currentTimeMillis() + ((selectedDays * 24L + selectedHours) * 3600000L)
+            val formatter = remember { SimpleDateFormat("EEEE, MMM d 'at' h:mm a", Locale.getDefault()) }
+            val expiryText = formatter.format(Date(expiryMillis))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    tint = MeshColor.Primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Expires: $expiryText",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontStyle = FontStyle.Italic,
+                    color = MeshColor.Primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WheelColumn(
+    label: String,
+    range: IntRange,
+    selectedValue: Int,
+    onValueChanged: (Int) -> Unit,
+    displayTransform: (Int) -> String,
+    modifier: Modifier = Modifier
+) {
+    val items = range.toList()
+    val visibleItems = 3
+    val itemHeight = 44.dp
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (items.indexOf(selectedValue)).coerceAtLeast(0)
+    )
+    val coroutineScope = rememberCoroutineScope()
+
+    // Detect settled scroll and snap
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val centerIndex = listState.firstVisibleItemIndex +
+                    (if (listState.firstVisibleItemScrollOffset > 0) 1 else 0)
+            val snappedIndex = centerIndex.coerceIn(0, items.lastIndex)
+
+            if (items[snappedIndex] != selectedValue) {
+                onValueChanged(items[snappedIndex])
+            }
+            listState.animateScrollToItem(snappedIndex)
+        }
+    }
+
+    // Sync external changes
+    LaunchedEffect(selectedValue) {
+        val targetIndex = items.indexOf(selectedValue)
+        if (targetIndex >= 0 && targetIndex != listState.firstVisibleItemIndex) {
+            listState.animateScrollToItem(targetIndex)
+        }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(horizontal = 8.dp)
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MeshColor.TextSecondary,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier.height(itemHeight * visibleItems),
+            contentAlignment = Alignment.Center
+        ) {
+            // Selection highlight band
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(itemHeight)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MeshColor.Primary.copy(alpha = 0.1f))
+                    .border(1.dp, MeshColor.Primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            )
+
+            // Scrollable values
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .height(itemHeight * visibleItems)
+                    .drawWithContent {
+                        drawContent()
+                        // Top fade
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFFF8F7F6),
+                                    Color(0x00F8F7F6)
+                                ),
+                                startY = 0f,
+                                endY = itemHeight.toPx()
+                            )
+                        )
+                        // Bottom fade
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x00F8F7F6),
+                                    Color(0xFFF8F7F6)
+                                ),
+                                startY = size.height - itemHeight.toPx(),
+                                endY = size.height
+                            )
+                        )
+                    },
+                contentPadding = PaddingValues(vertical = itemHeight),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                items(items.size) { index ->
+                    val value = items[index]
+                    val isSelected = value == selectedValue
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(itemHeight)
+                            .clickable {
+                                onValueChanged(value)
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(index)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            displayTransform(value),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Normal,
+                            color = if (isSelected) MeshColor.TextPrimary else MeshColor.TextSecondary.copy(alpha = 0.4f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -390,3 +630,4 @@ private fun TypeCard(
         }
     }
 }
+

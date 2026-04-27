@@ -23,6 +23,9 @@ message PigeonEvent {
   int64 timestamp = 6;
   string creatorDeviceId = 7;
   bool isResolved = 8;
+  string creatorName = 9;
+  string title = 10;
+  int64 expiryTimestamp = 11;
 }
 
 message SyncItem {

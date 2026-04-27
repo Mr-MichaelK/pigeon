@@ -2,6 +2,7 @@ package com.example.pigeon.ui.screens.log
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,11 +17,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
@@ -31,9 +37,11 @@ import org.maplibre.android.geometry.LatLng
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun EventLogScreen(
-    viewModel: EventLogViewModel
+    viewModel: EventLogViewModel,
+    onLongPressEvent: (eventId: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -49,10 +57,16 @@ fun EventLogScreen(
                 .background(MeshColor.Background)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            EventLogSearchBar(
-                query = uiState.searchQuery,
-                onQueryChange = viewModel::onSearchQueryChanged
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EventLogSearchBar(
+                    query = uiState.searchQuery,
+                    onQueryChange = viewModel::onSearchQueryChanged,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             
             Spacer(modifier = Modifier.height(12.dp))
             
@@ -86,7 +100,8 @@ fun EventLogScreen(
                     EventLogItem(
                         event = event,
                         userLocation = uiState.userLocation,
-                        onResolve = { viewModel.onResolveEvent(event.eventId) }
+                        onResolve = { viewModel.onResolveEvent(event.eventId) },
+                        onLongPress = { onLongPressEvent(event.eventId) }
                     )
                 }
             }
@@ -97,10 +112,11 @@ fun EventLogScreen(
 @Composable
 fun EventLogSearchBar(
     query: String,
-    onQueryChange: (String) -> Unit
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
             .background(MeshColor.Surface, RoundedCornerShape(8.dp))
@@ -182,12 +198,21 @@ fun EventLogFilterRow(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun EventLogItem(
     event: Event,
     userLocation: LatLng?,
-    onResolve: () -> Unit
+    onResolve: () -> Unit,
+    onLongPress: () -> Unit = {}
 ) {
+    val haptic = LocalHapticFeedback.current
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 300f),
+        label = "LongPressScale"
+    )
     val distance = remember(event, userLocation) {
         if (userLocation != null) {
             LocationUtils.calculateDistance(
@@ -227,9 +252,21 @@ fun EventLogItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Column(modifier = Modifier.padding(bottom = 16.dp)) {
+        Column(modifier = Modifier
+            .padding(bottom = 16.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+        ) {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            isPressed = true
+                            onLongPress()
+                        }
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MeshColor.Surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -276,41 +313,26 @@ fun EventLogItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = event.creatorDeviceId,
+                            text = event.creatorName,
                             style = MaterialTheme.typography.labelSmall,
                             color = MeshColor.TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
+                                .weight(1f)
                                 .background(MeshColor.Background, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                         
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
                         if (!event.isResolved) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                distance?.let { d ->
-                                    Text(
-                                        text = if (d >= 1000) String.format("%.1fkm", d/1000) else String.format("%.0fm", d),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isWithinRadius) MeshColor.Primary.copy(alpha = 0.7f) else MeshColor.EmergencyRed.copy(alpha = 0.7f),
-                                        modifier = Modifier.padding(end = 8.dp)
-                                    )
-                                }
-                                
-                                TextButton(
-                                    onClick = onResolve,
-                                    enabled = isWithinRadius,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.height(32.dp),
-                                    colors = ButtonDefaults.textButtonColors(
-                                        disabledContentColor = MeshColor.TextSecondary.copy(alpha = 0.5f)
-                                    )
-                                ) {
-                                    Text(
-                                        text = if (isWithinRadius) "MARK RESOLVED" else "TOO FAR",
-                                        color = if (isWithinRadius) MeshColor.Primary else MeshColor.TextPrimary.copy(alpha = 0.38f),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                            distance?.let { d ->
+                                Text(
+                                    text = if (d >= 1000) String.format("%.1fkm", d/1000) else String.format("%.0fm", d),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isWithinRadius) MeshColor.Primary.copy(alpha = 0.7f) else MeshColor.EmergencyRed.copy(alpha = 0.7f)
+                                )
                             }
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {

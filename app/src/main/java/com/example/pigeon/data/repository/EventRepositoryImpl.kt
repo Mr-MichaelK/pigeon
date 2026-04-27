@@ -41,4 +41,16 @@ class EventRepositoryImpl @Inject constructor(
     override suspend fun clearAllEvents() {
         eventDao.deleteAllEvents()
     }
+
+    override suspend fun getRecentEventCount(creatorId: String, sinceTimestamp: Long): Int {
+        return eventDao.getRecentEventCountByCreator(creatorId, sinceTimestamp)
+    }
+
+    override suspend fun getCooldownBaseTimestamp(creatorId: String, sinceTimestamp: Long): Long? {
+        return eventDao.getCooldownBaseTimestamp(creatorId, sinceTimestamp)
+    }
+
+    override suspend fun resetUserCooldown(creatorId: String, sinceTimestamp: Long) {
+        eventDao.deleteRecentEventsByCreator(creatorId, sinceTimestamp)
+    }
 }

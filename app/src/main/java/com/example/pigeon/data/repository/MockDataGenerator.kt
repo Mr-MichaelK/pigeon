@@ -11,15 +11,17 @@ class MockDataGenerator @Inject constructor() {
     fun generateMockEvents(): List<EventEntity> {
         val events = mutableListOf<EventEntity>()
         val connectionDeviceIds = listOf("NODE-A1B2", "NODE-C3D4", "NODE-E5F6", "NODE-G7H8")
+        val mockNames = listOf("Ghost-7", "Viper-2", "Echo-9", "Alpha-5", "Bravo-3", "Shadow-1")
         val baseLat = 33.8938 // Beirut roughly
         val baseLon = 35.5018
 
         // Generate 5 mock events
-        for (i in 1..5) {
-            val type = EventType.values().random()
+        for (_i in 1..5) {
+            val type = EventType.entries.random()
             val isResolved = Random.nextBoolean()
             // Random time within last 48 hours
             val timestamp = System.currentTimeMillis() - Random.nextLong(0, 48 * 60 * 60 * 1000)
+            val ttl = 72 * 60 * 60 * 1000L
             
             events.add(
                 EventEntity(
@@ -32,7 +34,9 @@ class MockDataGenerator @Inject constructor() {
                     longitude = baseLon + (Random.nextDouble() - 0.5) * 0.05,
                     timestamp = timestamp,
                     isResolved = isResolved,
-                    ttl = 72 * 60 * 60 * 1000 // 72 hours
+                    creatorName = mockNames.random(),
+                    ttl = ttl,
+                    expiryTimestamp = timestamp + ttl
                 )
             )
         }

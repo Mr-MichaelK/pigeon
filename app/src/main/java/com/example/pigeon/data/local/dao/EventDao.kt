@@ -30,6 +30,15 @@ interface EventDao {
     @Query("DELETE FROM events")
     suspend fun deleteAllEvents()
 
-    @Query("DELETE FROM events WHERE timestamp < :expirationTime")
-    suspend fun deleteExpiredEvents(expirationTime: Long): Int
+    @Query("DELETE FROM events WHERE expiryTimestamp < :currentTime")
+    suspend fun deleteExpiredEvents(currentTime: Long): Int
+
+    @Query("SELECT COUNT(*) FROM events WHERE creatorDeviceId = :creatorId AND timestamp >= :sinceTimestamp")
+    suspend fun getRecentEventCountByCreator(creatorId: String, sinceTimestamp: Long): Int
+
+    @Query("SELECT timestamp FROM events WHERE creatorDeviceId = :creatorId AND timestamp >= :sinceTimestamp ORDER BY timestamp DESC LIMIT 1 OFFSET 2")
+    suspend fun getCooldownBaseTimestamp(creatorId: String, sinceTimestamp: Long): Long?
+
+    @Query("DELETE FROM events WHERE creatorDeviceId = :creatorId AND timestamp >= :sinceTimestamp")
+    suspend fun deleteRecentEventsByCreator(creatorId: String, sinceTimestamp: Long)
 }

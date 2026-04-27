@@ -16,7 +16,9 @@ data class EventEntity(
     val longitude: Double,
     val timestamp: Long,
     val isResolved: Boolean = false,
-    val ttl: Long
+    val creatorName: String,
+    val ttl: Long,
+    val expiryTimestamp: Long
 )
 
 fun EventEntity.toDomain(): Event = Event(
@@ -29,7 +31,9 @@ fun EventEntity.toDomain(): Event = Event(
     longitude = longitude,
     timestamp = timestamp,
     isResolved = isResolved,
-    ttl = ttl
+    creatorName = creatorName,
+    ttl = ttl,
+    expiryTimestamp = expiryTimestamp
 )
 
 fun Event.toEntity(): EventEntity = EventEntity(
@@ -42,5 +46,7 @@ fun Event.toEntity(): EventEntity = EventEntity(
     longitude = longitude,
     timestamp = timestamp,
     isResolved = isResolved,
-    ttl = ttl
+    creatorName = creatorName,
+    ttl = ttl,
+    expiryTimestamp = expiryTimestamp
 )

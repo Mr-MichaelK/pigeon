@@ -10,6 +10,7 @@ plugins {
 android {
     namespace = "com.example.pigeon"
     compileSdk = 35
+    ndkVersion = "28.0.12433566"
     
     defaultConfig {
         applicationId = "com.example.pigeon"
@@ -63,6 +64,10 @@ android {
             useLegacyPackaging = false
         }
     }
+
+    androidResources {
+        noCompress.add("so")
+    }
 }
 
 dependencies {
@@ -75,6 +80,7 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.compose.foundation)
     ksp(libs.androidx.room.compiler)
 
     // Hilt
@@ -84,6 +90,7 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.service)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -113,6 +120,7 @@ dependencies {
 
     // Network
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.protobuf:protobuf-kotlin-lite:3.25.1")
     implementation("com.google.protobuf:protobuf-javalite:3.25.1")
 
