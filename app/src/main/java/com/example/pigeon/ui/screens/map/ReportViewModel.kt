@@ -10,6 +10,7 @@ import com.example.pigeon.domain.network.NearbySyncManager
 import com.example.pigeon.domain.repository.EventRepository
 import com.example.pigeon.proto.PigeonEvent
 import com.example.pigeon.domain.repository.UserRepository
+import com.example.pigeon.data.service.MeshServiceController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,7 +21,8 @@ import javax.inject.Inject
 class ReportViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val userRepository: UserRepository,
-    private val nearbySyncManager: NearbySyncManager
+    private val nearbySyncManager: NearbySyncManager,
+    private val meshController: MeshServiceController
 ) : ViewModel() {
     
     companion object {
@@ -116,10 +118,11 @@ class ReportViewModel @Inject constructor(
             // 1. Save to local ledger
             eventRepository.createEvent(event)
             
-            // 2. Upgrade to Sticky ACTIVE (Rule 2)
-            nearbySyncManager.togglePowerState(MeshPowerState.ACTIVE, isSticky = true)
-            
-            // 3. Initiate Wave for others
+            // 2. Upgrade to Sticky ACTIVE (Rule 2) via the foreground service so
+            //    the radio survives backgrounding while the report propagates.
+            meshController.setPowerState(MeshPowerState.ACTIVE, isSticky = true)
+
+            // 3. Initiate Wave for others (radio-internal — no service hop needed)
             nearbySyncManager.startProximityWave()
 
             // 4. Broadcast to nearby peers immediately

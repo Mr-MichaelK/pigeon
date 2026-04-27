@@ -570,7 +570,7 @@ fun MeshHeader(
                             fontWeight = FontWeight.Bold,
                             color = MeshColor.TextPrimary,
                             maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             softWrap = false
                         )
                         if (showFixIndicator) {

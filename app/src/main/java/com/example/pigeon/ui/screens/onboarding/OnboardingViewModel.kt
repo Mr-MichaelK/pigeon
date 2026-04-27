@@ -2,12 +2,11 @@ package com.example.pigeon.ui.screens.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewModelScope
 import com.example.pigeon.domain.model.Gender
 import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.User
-import com.example.pigeon.domain.network.NearbySyncManager
 import com.example.pigeon.domain.repository.UserRepository
+import com.example.pigeon.data.service.MeshServiceController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +30,7 @@ data class OnboardingUiState(
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val userRepository: UserRepository,
-    private val nearbySyncManager: NearbySyncManager
+    private val meshController: MeshServiceController
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
@@ -83,7 +82,9 @@ class OnboardingViewModel @Inject constructor(
             )
             
             userRepository.saveUser(user)
-            nearbySyncManager.togglePowerState(MeshPowerState.PASSIVE, isSticky = true)
+            // Hand control of the radio to the foreground service so it survives
+            // the user backgrounding the app right after onboarding.
+            meshController.setPowerState(MeshPowerState.PASSIVE, isSticky = true)
             _uiState.update { it.copy(isSaving = false, isProfileCreated = true) }
         }
     }

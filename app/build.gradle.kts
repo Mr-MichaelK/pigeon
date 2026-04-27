@@ -90,6 +90,7 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.service)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))

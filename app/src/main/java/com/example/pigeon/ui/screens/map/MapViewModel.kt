@@ -9,6 +9,7 @@ import com.example.pigeon.domain.repository.EventRepository
 import com.example.pigeon.domain.repository.LocationRepository
 import com.example.pigeon.domain.repository.VerificationRepository
 import com.example.pigeon.domain.network.NearbySyncManager
+import com.example.pigeon.data.service.MeshServiceController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import org.maplibre.android.geometry.LatLng
 import com.example.pigeon.ui.util.LocationUtils
@@ -39,7 +40,8 @@ class MapViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val locationRepository: LocationRepository,
     private val verificationRepository: VerificationRepository,
-    private val nearbySyncManager: NearbySyncManager
+    private val nearbySyncManager: NearbySyncManager,
+    private val meshController: MeshServiceController
 ) : ViewModel() {
 
     private val _metadata = MutableStateFlow(
@@ -148,11 +150,15 @@ class MapViewModel @Inject constructor(
     }
 
     init {
-        // Task 8.6: Auto-activate mesh to PASSIVE (Advertising) on startup
-        // This ensures the device is visible to others immediately,
-        // without overriding an existing user-initiated ACTIVE state.
+        // Task 8.6: Auto-activate mesh to PASSIVE (Advertising) on startup.
+        // Routed through the foreground service so the radio lives in a
+        // process that can survive Doze/backgrounding — the previous direct
+        // toggle let the OS reclaim the mesh as soon as the user left the app.
         if (nearbySyncManager.status.value == com.example.pigeon.domain.network.ConnectionStatus.OFF) {
-            nearbySyncManager.togglePowerState(com.example.pigeon.domain.model.MeshPowerState.PASSIVE, isSticky = false)
+            meshController.setPowerState(
+                com.example.pigeon.domain.model.MeshPowerState.PASSIVE,
+                isSticky = false
+            )
         }
 
         // The repo owns the start timestamp (it's a Singleton, so it survives
