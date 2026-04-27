@@ -115,24 +115,7 @@ fun MapScreen(
     val locationQuality by viewModel.locationQuality.collectAsStateWithLifecycle()
     val hasGpsFix = uiState.userLocation != null
 
-    // Track how long we've been searching for a lock (resets when LOCKED)
-    var locatingStartMs by remember { mutableStateOf<Long?>(null) }
-    var locatingElapsedSec by remember { mutableIntStateOf(0) }
-    LaunchedEffect(locationQuality) {
-        if (locationQuality == com.example.pigeon.domain.model.LocationQuality.LOCKED) {
-            locatingStartMs = null
-            locatingElapsedSec = 0
-        } else if (locatingStartMs == null) {
-            locatingStartMs = System.currentTimeMillis()
-        }
-    }
-    LaunchedEffect(locatingStartMs) {
-        val start = locatingStartMs ?: return@LaunchedEffect
-        while (true) {
-            locatingElapsedSec = ((System.currentTimeMillis() - start) / 1000).toInt()
-            delay(1000)
-        }
-    }
+    val locatingElapsedSec by viewModel.locatingElapsedSec.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         reportViewModel.reportError.collect { errorMsg ->
@@ -303,7 +286,13 @@ fun MapScreen(
                 Lifecycle.Event.ON_PAUSE -> mapView.onPause()
                 Lifecycle.Event.ON_STOP -> {
                     mapView.onStop()
-                    viewModel.stopLocationUpdates()
+                    // Intentionally NOT stopping location updates here. The GPS
+                    // chipset on Helio G85 has a ~96 s cold-start TTFF; tearing
+                    // down on every screen change (or short backgrounding) means
+                    // we never warm up enough to get a fix indoors. Repository
+                    // is a Singleton, so the subscription persists for the app's
+                    // foreground lifetime — Android throttles location power
+                    // when the process is fully backgrounded anyway.
                 }
                 Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
                 else -> {}
@@ -576,11 +565,13 @@ fun MeshHeader(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             "$latStr, $lonStr",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MeshColor.TextPrimary,
                             maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
+                            softWrap = false
                         )
                         if (showFixIndicator) {
                             Spacer(modifier = Modifier.height(4.dp))

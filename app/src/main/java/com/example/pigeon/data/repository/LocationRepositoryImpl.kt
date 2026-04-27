@@ -10,7 +10,6 @@ import android.os.SystemClock
 import android.util.Log
 import com.example.pigeon.domain.model.LocationQuality
 import com.example.pigeon.domain.repository.LocationRepository
-import com.google.android.gms.location.Granularity
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -40,6 +39,21 @@ class LocationRepositoryImpl @Inject constructor(
     private val _locationQuality = MutableStateFlow(LocationQuality.NO_FIX)
     override val locationQuality: Flow<LocationQuality> = _locationQuality.asStateFlow()
 
+    // Locating-timer source of truth. Lives on the singleton repo so it
+    // survives MapViewModel recreation (bottom-nav re-entry rebuilds the
+    // navBackStackEntry-scoped ViewModel). Set to wall-clock millis the first
+    // time quality drops below LOCKED, cleared back to null on LOCKED.
+    private val _locatingSinceMs = MutableStateFlow<Long?>(null)
+    override val locatingSinceMs: kotlinx.coroutines.flow.StateFlow<Long?> = _locatingSinceMs.asStateFlow()
+
+    private fun updateLocatingTimer(quality: LocationQuality) {
+        if (quality == LocationQuality.LOCKED) {
+            _locatingSinceMs.value = null
+        } else if (_locatingSinceMs.value == null) {
+            _locatingSinceMs.value = System.currentTimeMillis()
+        }
+    }
+
     private val fusedClient = LocationServices.getFusedLocationProviderClient(context)
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
@@ -61,15 +75,29 @@ class LocationRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startLocationUpdates() {
-        if (!hasLocationPermission()) return
-        stopLocationUpdates()
+        if (!hasLocationPermission()) {
+            Log.w(TAG, "startLocationUpdates: ACCESS_FINE_LOCATION not granted — skipping.")
+            return
+        }
+        if (fusedCallback != null) {
+            Log.d(TAG, "startLocationUpdates: already running — skipping.")
+            return
+        }
+        Log.d(TAG, "startLocationUpdates: subscribing to fused + GPS providers.")
+        // Engage the locating-elapsed timer immediately so the UI indicator
+        // starts ticking even when the fused/GPS providers stay silent.
+        updateLocatingTimer(_locationQuality.value)
 
         // ── Seed from last known location ────────────────────────────────────
         // Only seed from a demonstrably fresh, accurate, non-mock cached fix.
         // Wall-clock time.time has no freshness contract; use the monotonic
         // elapsedRealtimeNanos field which is filled by the hardware driver.
         fusedClient.lastLocation.addOnSuccessListener { location ->
-            if (location == null || _userLocation.value != null) return@addOnSuccessListener
+            if (location == null) {
+                Log.d(TAG, "Seed: lastLocation returned null — no cached fix available.")
+                return@addOnSuccessListener
+            }
+            if (_userLocation.value != null) return@addOnSuccessListener
             if (isMockLocation(location)) {
                 Log.w(TAG, "Seed rejected — mock location discarded.")
                 return@addOnSuccessListener
@@ -81,31 +109,44 @@ class LocationRepositoryImpl @Inject constructor(
                 _gpsAccuracy.value = location.accuracy
                 _userLocation.value = LatLng(location.latitude, location.longitude)
                 _locationQuality.value = classify(location.accuracy, _locationQuality.value)
+                updateLocatingTimer(_locationQuality.value)
+            } else {
+                Log.d(TAG, "Seed rejected — age=${ageMs}ms acc=${location.accuracy}m " +
+                        "(limits: age≤${SEED_MAX_AGE_MS}ms acc≤${SEED_MAX_ACCURACY_M}m).")
             }
+        }.addOnFailureListener { e ->
+            Log.w(TAG, "Seed: lastLocation failed — ${e.message}")
         }
 
         // ── Fused location request ────────────────────────────────────────────
-        // Key settings for Samsung M32 / Helio G85:
+        // Lessons from the M32 silent-callback bug:
         //
-        // PRIORITY_HIGH_ACCURACY — instructs the provider to use GPS satellites.
+        // No setMinUpdateDistanceMeters — earlier we used 2 m to suppress the
+        //   stationary-vibration of mixed GPS/network fixes, but Samsung's FLP
+        //   shim treats the boot-time cached lastLocation as the displacement
+        //   reference. Stationary user → never moves 2 m → ZERO callbacks
+        //   delivered for the entire session. Map-dot stability is now handled
+        //   downstream by the accuracy filter + classify() hysteresis instead.
         //
-        // GRANULARITY_FINE — forces fine (GPS-grade) output even when both
-        //   COARSE and FINE permissions are present. The default
-        //   GRANULARITY_PERMISSION_LEVEL lets the MediaTek fused provider
-        //   mix GPS and network sources freely, causing the coarse↔fine flip.
+        // No setGranularity(FINE) — FINE blocks the network/WiFi fallback the
+        //   fused provider would otherwise mix in while GPS warms up (which is
+        //   ~96 s on this chipset). With weak satellite reception that meant
+        //   the user saw nothing for minutes. classify() handles the COARSE↔
+        //   LOCKED flip properly now, so we can let the OS mix sources.
         //
-        // setMinUpdateDistanceMeters(2f) — suppresses updates while stationary.
-        //   Without this, GPS and network fixes return slightly different
-        //   coordinates for the same physical point, making the map dot vibrate.
+        // PRIORITY_HIGH_ACCURACY stays — we still want GPS as the source of
+        // truth once it's available; it just isn't the *only* allowed source.
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2_000L)
             .setMinUpdateIntervalMillis(1_000L)
-            .setMinUpdateDistanceMeters(2.0f)
-            .setGranularity(Granularity.GRANULARITY_FINE)
             .build()
 
         fusedCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                val location = result.lastLocation ?: return
+                val location = result.lastLocation
+                if (location == null) {
+                    Log.d(TAG, "Fused callback fired with null location.")
+                    return
+                }
 
                 // Reject developer/test mock injections.
                 if (isMockLocation(location)) {
@@ -117,7 +158,12 @@ class LocationRepositoryImpl @Inject constructor(
                 _gpsAccuracy.value = location.accuracy
 
                 // Reject stale fixes regardless of accuracy.
-                if (!isFresh(location)) return
+                if (!isFresh(location)) {
+                    val ageMs = (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000L
+                    Log.d(TAG, "Fused fix dropped by isFresh — acc=${location.accuracy}m age=${ageMs}ms " +
+                            "(limits: acc≤${FIX_MAX_ACCURACY_M}m age≤${FIX_MAX_AGE_MS}ms).")
+                    return
+                }
 
                 // ── Accuracy filter ───────────────────────────────────────────
                 // Primary gate: accept only fixes ≤ ACCURACY_THRESHOLD_M (20 m).
@@ -145,10 +191,13 @@ class LocationRepositoryImpl @Inject constructor(
                 lastValidFusedElapsed = SystemClock.elapsedRealtime()
                 _userLocation.value = LatLng(location.latitude, location.longitude)
                 _locationQuality.value = classify(location.accuracy, _locationQuality.value)
+                updateLocatingTimer(_locationQuality.value)
             }
         }
 
         fusedClient.requestLocationUpdates(request, fusedCallback!!, Looper.getMainLooper())
+            .addOnSuccessListener { Log.d(TAG, "Fused requestLocationUpdates: subscription confirmed.") }
+            .addOnFailureListener { e -> Log.w(TAG, "Fused requestLocationUpdates failed — ${e.message}") }
         startGpsFallback()
     }
 
@@ -163,7 +212,11 @@ class LocationRepositoryImpl @Inject constructor(
      */
     @SuppressLint("MissingPermission")
     private fun startGpsFallback() {
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            Log.w(TAG, "startGpsFallback: GPS_PROVIDER disabled — fallback not registered.")
+            return
+        }
+        Log.d(TAG, "startGpsFallback: subscribing to GPS_PROVIDER.")
 
         gpsListener = LocationListener { location: Location ->
             if (isMockLocation(location)) {
@@ -177,6 +230,10 @@ class LocationRepositoryImpl @Inject constructor(
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 _userLocation.value = LatLng(location.latitude, location.longitude)
                 _locationQuality.value = classify(location.accuracy, _locationQuality.value)
+                updateLocatingTimer(_locationQuality.value)
+            } else {
+                val ageMs = (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000L
+                Log.d(TAG, "GPS fallback skipped — fusedSilent=${fusedSilentMs}ms acc=${location.accuracy}m age=${ageMs}ms.")
             }
         }
 
@@ -190,6 +247,8 @@ class LocationRepositoryImpl @Inject constructor(
     }
 
     override fun stopLocationUpdates() {
+        if (fusedCallback == null && gpsListener == null) return
+        Log.d(TAG, "stopLocationUpdates: tearing down fused + GPS subscriptions.")
         fusedCallback?.let { fusedClient.removeLocationUpdates(it) }
         fusedCallback = null
         gpsListener?.let { locationManager.removeUpdates(it) }

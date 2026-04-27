@@ -12,6 +12,7 @@ import com.example.pigeon.domain.network.NearbySyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import org.maplibre.android.geometry.LatLng
 import com.example.pigeon.ui.util.LocationUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -71,6 +72,12 @@ class MapViewModel @Inject constructor(
                 SharingStarted.WhileSubscribed(5000),
                 com.example.pigeon.domain.model.LocationQuality.NO_FIX
             )
+
+    // Locating timer — derives from the singleton LocationRepository so it
+    // persists across MapViewModel recreation (the bottom-nav rebuilds the
+    // navBackStackEntry-scoped ViewModel on every Map re-entry).
+    private val _locatingElapsedSec = MutableStateFlow(0)
+    val locatingElapsedSec: StateFlow<Int> = _locatingElapsedSec.asStateFlow()
 
     val meshStatus: StateFlow<com.example.pigeon.domain.network.ConnectionStatus> = nearbySyncManager.status
     val isLinking: StateFlow<Boolean> = nearbySyncManager.isLinking
@@ -146,6 +153,18 @@ class MapViewModel @Inject constructor(
         // without overriding an existing user-initiated ACTIVE state.
         if (nearbySyncManager.status.value == com.example.pigeon.domain.network.ConnectionStatus.OFF) {
             nearbySyncManager.togglePowerState(com.example.pigeon.domain.model.MeshPowerState.PASSIVE, isSticky = false)
+        }
+
+        // The repo owns the start timestamp (it's a Singleton, so it survives
+        // ViewModel recreation). One ticker reads the latest value each second
+        // and recomputes elapsed — works correctly across navigation away/back.
+        viewModelScope.launch {
+            while (true) {
+                val since = locationRepository.locatingSinceMs.value
+                _locatingElapsedSec.value = if (since == null) 0
+                else ((System.currentTimeMillis() - since) / 1000).toInt().coerceAtLeast(0)
+                delay(1000)
+            }
         }
     }
 
