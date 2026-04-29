@@ -103,7 +103,10 @@ class MeshService : LifecycleService() {
 
     private fun stopMeshAndService() {
         Log.d(TAG, "Stopping mesh and tearing down service")
-        nearbySyncManager.stop()
+        // Route through togglePowerState so the manager flips _status to OFF —
+        // a bare stop() tears down the radio but leaves the status flow stuck
+        // at the previous value, which keeps the UI's OFF toggle un-highlighted.
+        nearbySyncManager.togglePowerState(MeshPowerState.OFF, isSticky = false)
         persistState(MeshPowerState.OFF, false)
         releaseWakeLock()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -145,14 +148,27 @@ class MeshService : LifecycleService() {
     ): Pair<String, String> {
         val title = when (status) {
             is ConnectionStatus.OFF -> "Pigeon Mesh Stopped"
-            is ConnectionStatus.PASSIVE -> "Pigeon Mesh Active"
-            is ConnectionStatus.ACTIVE -> "Pigeon Mesh Active"
+            is ConnectionStatus.PASSIVE -> "Pigeon Mesh • Passive"
+            is ConnectionStatus.ACTIVE -> "Pigeon Mesh • Active"
         }
-        val body = when {
+        val peerSummary = when {
             connected == 1 -> "1 peer in range"
             connected > 1 -> "$connected peers in range"
-            seen > 0 -> "Searching nearby ($seen seen recently)"
-            else -> "Searching for nearby peers..."
+            seen > 0 -> "$seen seen recently"
+            else -> null
+        }
+        val modeBlurb = when (status) {
+            is ConnectionStatus.OFF -> "Radio off — not advertising or scanning"
+            is ConnectionStatus.PASSIVE -> "Listening for peers (low power)"
+            is ConnectionStatus.ACTIVE -> "Scanning for peers"
+        }
+        // Append the peer summary to the mode blurb when we have one, otherwise
+        // the body is just the mode line — keeps the notification a single
+        // glanceable row regardless of state.
+        val body = if (peerSummary != null && status !is ConnectionStatus.OFF) {
+            "$modeBlurb • $peerSummary"
+        } else {
+            modeBlurb
         }
         return title to body
     }
@@ -185,7 +201,7 @@ class MeshService : LifecycleService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(body)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_mesh_notification)
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

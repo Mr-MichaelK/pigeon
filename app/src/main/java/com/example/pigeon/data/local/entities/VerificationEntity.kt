@@ -22,5 +22,7 @@ data class VerificationEntity(
     val eventId: String,
     val signerId: String,
     val isConfirm: Boolean,
-    val timestamp: Long
+    val timestamp: Long,
+    val signerPublicKey: ByteArray = ByteArray(0),
+    val signature: ByteArray = ByteArray(0)
 )

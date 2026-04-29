@@ -36,7 +36,9 @@ object DatabaseModule {
             com.example.pigeon.data.local.MIGRATION_5_6,
             com.example.pigeon.data.local.MIGRATION_6_7,
             com.example.pigeon.data.local.MIGRATION_7_8,
-            com.example.pigeon.data.local.MIGRATION_8_9
+            com.example.pigeon.data.local.MIGRATION_8_9,
+            com.example.pigeon.data.local.MIGRATION_9_10,
+            com.example.pigeon.data.local.MIGRATION_10_11
         )
         .build()
     }

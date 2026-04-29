@@ -17,6 +17,10 @@ data class User(
     val nodeId: String = "",
     val isVerified: Boolean = false,
     val totalSyncs: Int = 0,
-    val trustScore: Float = 100.0f,
+    // Distributed Trust: peers start at zero and earn trust through valid
+    // signed verifications from other peers. The prior 100.0 default
+    // pre-granted unearned reputation, which is incompatible with a
+    // cryptographic identity model where keys are cheap to mint.
+    val trustScore: Float = 0.0f,
     val lastUpdatedTimestamp: Long
 )

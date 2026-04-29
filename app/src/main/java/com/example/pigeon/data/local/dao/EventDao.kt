@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.example.pigeon.data.local.entities.EventEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -15,11 +16,29 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE isResolved = 0 ORDER BY timestamp DESC")
     fun getUnresolvedEvents(): Flow<List<EventEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEvent(event: EventEntity)
-    
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Query("SELECT * FROM events WHERE eventId = :eventId LIMIT 1")
+    suspend fun getEventById(eventId: String): EventEntity?
+
+    // Distributed Trust: REPLACE was the prior policy, which let any incoming
+    // event with a colliding eventId silently overwrite the original — so a
+    // peer could clobber someone else's event by re-broadcasting it under
+    // their own creatorDeviceId. With IGNORE, the first writer wins at the
+    // SQL layer, and the repository layer enforces the secondary rule (same
+    // original creator + strictly newer timestamp gates a controlled update).
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEvent(event: EventEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEvents(events: List<EventEntity>)
+
+    /**
+     * Full-row replace gated by the repository's signature/creator/timestamp
+     * check. Use this only after `getEventById` confirms the existing row was
+     * authored by the same creatorDeviceId and the incoming timestamp strictly
+     * exceeds the existing one — otherwise data integrity rules are bypassed.
+     */
+    @Update
+    suspend fun updateEvent(event: EventEntity)
 
     @Query("UPDATE events SET isResolved = :isResolved WHERE eventId = :eventId")
     suspend fun updateEventStatus(eventId: String, isResolved: Boolean)

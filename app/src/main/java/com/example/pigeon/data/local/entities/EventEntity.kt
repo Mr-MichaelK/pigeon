@@ -18,7 +18,9 @@ data class EventEntity(
     val isResolved: Boolean = false,
     val creatorName: String,
     val ttl: Long,
-    val expiryTimestamp: Long
+    val expiryTimestamp: Long,
+    val creatorPublicKey: ByteArray = ByteArray(0),
+    val signature: ByteArray = ByteArray(0)
 )
 
 fun EventEntity.toDomain(): Event = Event(
@@ -33,7 +35,9 @@ fun EventEntity.toDomain(): Event = Event(
     isResolved = isResolved,
     creatorName = creatorName,
     ttl = ttl,
-    expiryTimestamp = expiryTimestamp
+    expiryTimestamp = expiryTimestamp,
+    creatorPublicKey = creatorPublicKey,
+    signature = signature
 )
 
 fun Event.toEntity(): EventEntity = EventEntity(
@@ -48,5 +52,7 @@ fun Event.toEntity(): EventEntity = EventEntity(
     isResolved = isResolved,
     creatorName = creatorName,
     ttl = ttl,
-    expiryTimestamp = expiryTimestamp
+    expiryTimestamp = expiryTimestamp,
+    creatorPublicKey = creatorPublicKey,
+    signature = signature
 )

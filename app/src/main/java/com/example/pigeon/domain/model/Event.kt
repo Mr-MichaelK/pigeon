@@ -19,7 +19,14 @@ data class Event(
     val isResolved: Boolean,
     val creatorName: String,
     val ttl: Long,
-    val expiryTimestamp: Long
+    val expiryTimestamp: Long,
+    // X.509 SubjectPublicKeyInfo bytes of the original creator's Ed25519 key.
+    // Persisted so manifest re-broadcasts can resend the original signature
+    // (any peer in the chain must be able to verify, not just the immediate
+    // recipient). Empty for legacy/mock rows; those are filtered out at egress.
+    val creatorPublicKey: ByteArray = ByteArray(0),
+    // Ed25519 signature over the canonical proto bytes (signature field cleared).
+    val signature: ByteArray = ByteArray(0)
 ) {
     /**
      * Checks if this event is within a specific radius of a LatLng coordinate.

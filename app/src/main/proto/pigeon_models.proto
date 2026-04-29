@@ -26,6 +26,13 @@ message PigeonEvent {
   string creatorName = 9;
   string title = 10;
   int64 expiryTimestamp = 11;
+  // X.509 SubjectPublicKeyInfo bytes of the creator's Ed25519 public key.
+  // Receivers must verify SHA-256(creator_public_key) == creatorDeviceId before
+  // trusting the signature — this binds the on-wire key to the claimed identity.
+  bytes creator_public_key = 12;
+  // Ed25519 signature over the serialized PigeonEvent with the signature field
+  // cleared. Any field tamper invalidates the signature.
+  bytes signature = 13;
 }
 
 message SyncItem {
@@ -51,4 +58,10 @@ message VerificationMessage {
   string signer_id = 3;
   bool is_confirm = 4;
   int64 timestamp = 5;
+  // Same scheme as PigeonEvent.creator_public_key — receivers verify
+  // SHA-256(signer_public_key) == signer_id, then verify the signature.
+  bytes signer_public_key = 6;
+  // Ed25519 signature over the serialized VerificationMessage with the
+  // signature field cleared.
+  bytes signature = 7;
 }

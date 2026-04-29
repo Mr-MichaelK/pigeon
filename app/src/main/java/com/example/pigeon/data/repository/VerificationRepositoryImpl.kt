@@ -1,14 +1,12 @@
 package com.example.pigeon.data.repository
 
-import android.content.Context
-import android.provider.Settings
+import com.example.pigeon.data.identity.IdentityKeyManager
 import com.example.pigeon.data.local.dao.VerificationDao
 import com.example.pigeon.data.local.entities.VerificationEntity
 import com.example.pigeon.domain.model.TrustScore
 import com.example.pigeon.domain.repository.VerificationRepository
 import com.example.pigeon.domain.network.NearbySyncManager
 import com.example.pigeon.proto.VerificationMessage
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -16,9 +14,9 @@ import javax.inject.Inject
 import javax.inject.Provider
 
 class VerificationRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val verificationDao: VerificationDao,
-    private val nearbySyncManager: Provider<NearbySyncManager>
+    private val nearbySyncManager: Provider<NearbySyncManager>,
+    private val identityKeyManager: IdentityKeyManager
 ) : VerificationRepository {
 
     override fun getTrustScore(eventId: String): Flow<TrustScore> {
@@ -43,25 +41,29 @@ class VerificationRepositoryImpl @Inject constructor(
     }
 
     override suspend fun verifyEvent(eventId: String, isConfirm: Boolean) {
-        val deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "UNKNOWN_DEVICE"
-        val verification = VerificationEntity(
-            id = UUID.randomUUID().toString(),
-            eventId = eventId,
-            signerId = deviceId,
-            isConfirm = isConfirm,
-            timestamp = System.currentTimeMillis()
-        )
-        verificationDao.insertVerification(verification)
+        // Sign the verification message under this device's Ed25519 identity.
+        // The manager stamps signer_id (= SHA-256 hex of public key) and the
+        // public key bytes onto the proto, so the persisted entity and the
+        // broadcast payload are byte-identical — no second derivation step
+        // needed for re-broadcasts via manifest sync.
+        val unsignedBuilder = VerificationMessage.newBuilder()
+            .setId(UUID.randomUUID().toString())
+            .setEventId(eventId)
+            .setIsConfirm(isConfirm)
+            .setTimestamp(System.currentTimeMillis())
+        val signed = identityKeyManager.signVerification(unsignedBuilder)
 
-        // Broadcast to mesh
-        val protoMsg = VerificationMessage.newBuilder()
-            .setId(verification.id)
-            .setEventId(verification.eventId)
-            .setSignerId(verification.signerId)
-            .setIsConfirm(verification.isConfirm)
-            .setTimestamp(verification.timestamp)
-            .build()
-        
-        nearbySyncManager.get().broadcastVerification(protoMsg)
+        val entity = VerificationEntity(
+            id = signed.id,
+            eventId = signed.eventId,
+            signerId = signed.signerId,
+            isConfirm = signed.isConfirm,
+            timestamp = signed.timestamp,
+            signerPublicKey = signed.signerPublicKey.toByteArray(),
+            signature = signed.signature.toByteArray()
+        )
+        verificationDao.insertVerification(entity)
+
+        nearbySyncManager.get().broadcastVerification(signed)
     }
 }
