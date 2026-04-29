@@ -1,5 +1,6 @@
 package com.example.pigeon.data.repository.local
 
+import com.example.pigeon.data.identity.IdentityKeyManager
 import com.example.pigeon.data.local.dao.UserDao
 import com.example.pigeon.data.local.entities.UserEntity
 import com.example.pigeon.domain.model.User
@@ -16,12 +17,15 @@ import java.util.concurrent.TimeUnit
 class LocalUserRepositoryTest {
 
     private lateinit var userDao: UserDao
+    private lateinit var identityKeyManager: IdentityKeyManager
     private lateinit var repository: LocalUserRepository
 
     @Before
     fun setup() {
         userDao = mock()
-        repository = LocalUserRepository(userDao)
+        identityKeyManager = mock()
+        whenever(identityKeyManager.signerId).thenReturn("0123456789abcdeffedcba9876543210")
+        repository = LocalUserRepository(userDao, identityKeyManager)
     }
 
     @Test

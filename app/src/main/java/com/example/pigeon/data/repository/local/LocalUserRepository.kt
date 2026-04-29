@@ -1,16 +1,13 @@
 package com.example.pigeon.data.repository.local
 
-import android.content.Context
-import android.provider.Settings
+import com.example.pigeon.data.identity.IdentityKeyManager
 import com.example.pigeon.data.local.dao.UserDao
 import com.example.pigeon.data.local.entities.toDomain
 import com.example.pigeon.data.local.entities.toEntity
 import com.example.pigeon.domain.model.User
 import com.example.pigeon.domain.repository.UserRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -19,7 +16,7 @@ import javax.inject.Inject
  */
 class LocalUserRepository @Inject constructor(
     private val userDao: UserDao,
-    @ApplicationContext private val context: Context
+    private val identityKeyManager: IdentityKeyManager
 ) : UserRepository {
 
     override fun getUser(): Flow<User?> {
@@ -28,27 +25,29 @@ class LocalUserRepository @Inject constructor(
 
     override suspend fun saveUser(user: User) {
         val existingUser = userDao.getUserSync()
-        
-        // Ensure nodeName is immutable once generated
+
+        // nodeName is the human-friendly display tag — immutable once generated
+        // so a re-saved profile doesn't visually flip identities mid-session.
         val finalNodeName = if (existingUser?.nodeName.isNullOrEmpty()) {
             generateNodeName()
         } else {
             existingUser!!.nodeName
         }
 
-        // Ensure nodeId is immutable once generated (Task 7.4)
-        val finalNodeId = if (existingUser?.nodeId.isNullOrEmpty()) {
-            UUID.randomUUID().toString()
-        } else {
-            existingUser!!.nodeId
-        }
+        // nodeId is now the cryptographic signerId — SHA-256 of the device's
+        // Ed25519 public key. Always (re)write it from IdentityKeyManager so a
+        // legacy UUID-based nodeId from a pre-trust install is migrated to the
+        // canonical key fingerprint on the next saveUser call. The keypair is
+        // pinned in EncryptedSharedPreferences, so this value is stable for
+        // the lifetime of the install (uninstall regenerates).
+        val finalNodeId = identityKeyManager.signerId
 
         val userWithMetadata = user.copy(
             nodeName = finalNodeName,
             nodeId = finalNodeId,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
-        
+
         userDao.upsertUser(userWithMetadata.toEntity())
     }
 
@@ -79,9 +78,11 @@ class LocalUserRepository @Inject constructor(
     }
 
     private fun generateNodeName(): String {
-        // Generate a deterministic node name based on ANDROID_ID (Task 7.4)
-        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-        val hash = androidId?.take(8)?.uppercase() ?: UUID.randomUUID().toString().take(8).uppercase()
-        return "NODE-$hash"
+        // Derive the human-readable callsign from the cryptographic signerId.
+        // First 8 hex chars give a 32-bit collision space, plenty for visual
+        // disambiguation in a peer list. Replaces the prior ANDROID_ID-based
+        // derivation, which was both a privacy leak and forgeable.
+        val tag = identityKeyManager.signerId.take(8).uppercase()
+        return "NODE-$tag"
     }
 }

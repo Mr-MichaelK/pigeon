@@ -11,6 +11,7 @@ import com.example.pigeon.domain.repository.EventRepository
 import com.example.pigeon.proto.PigeonEvent
 import com.example.pigeon.domain.repository.UserRepository
 import com.example.pigeon.data.service.MeshServiceController
+import com.example.pigeon.data.identity.IdentityKeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -22,7 +23,8 @@ class ReportViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val userRepository: UserRepository,
     private val nearbySyncManager: NearbySyncManager,
-    private val meshController: MeshServiceController
+    private val meshController: MeshServiceController,
+    private val identityKeyManager: IdentityKeyManager
 ) : ViewModel() {
     
     companion object {
@@ -98,26 +100,53 @@ class ReportViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val sanitizedTtl = minOf(ttlMillis, MAX_TTL_MILLIS)
             
+            val isAnonymous = user?.isAnonymous ?: false
+            val resolvedCreatorName = if (isAnonymous) {
+                "Anonymous Civilian"
+            } else {
+                user?.displayName.takeIf { !it.isNullOrBlank() }
+                    ?: user?.nodeName.takeIf { !it.isNullOrBlank() }
+                    ?: "Unknown"
+            }
+
+            // Build the proto unsigned, then sign once — the manager stamps
+            // creatorDeviceId / creator_public_key / signature atomically. We
+            // keep the signed proto as the canonical artifact and derive both
+            // the persisted Event and the broadcast payload from it, so the
+            // bytes on the wire are identical to the bytes in the database.
+            val unsignedBuilder = PigeonEvent.newBuilder()
+                .setEventId(eventId)
+                .setEventType(domainEventTypeToProto(eventType))
+                .setDescription(description)
+                .setLatitude(latitude)
+                .setLongitude(longitude)
+                .setTimestamp(now)
+                .setIsResolved(false)
+                .setCreatorName(resolvedCreatorName)
+                .setTitle(title)
+                .setExpiryTimestamp(now + sanitizedTtl)
+            val signed = identityKeyManager.signEvent(unsignedBuilder)
+
             val event = Event(
-                eventId = eventId,
-                creatorDeviceId = user?.nodeId ?: "UNKNOWN-NODE",
+                eventId = signed.eventId,
+                creatorDeviceId = signed.creatorDeviceId, // == identityKeyManager.signerId
                 eventType = eventType,
-                title = title,
-                description = description,
-                latitude = latitude,
-                longitude = longitude,
-                timestamp = now,
-                isResolved = false,
-                creatorName = user?.displayName.takeIf { !it.isNullOrBlank() } 
-                    ?: user?.nodeName.takeIf { !it.isNullOrBlank() } 
-                    ?: "Unknown",
+                title = signed.title,
+                description = signed.description,
+                latitude = signed.latitude,
+                longitude = signed.longitude,
+                timestamp = signed.timestamp,
+                isResolved = signed.isResolved,
+                creatorName = signed.creatorName,
                 ttl = sanitizedTtl,
-                expiryTimestamp = now + sanitizedTtl
+                expiryTimestamp = signed.expiryTimestamp,
+                creatorPublicKey = signed.creatorPublicKey.toByteArray(),
+                signature = signed.signature.toByteArray()
             )
-            
+
             // 1. Save to local ledger
             eventRepository.createEvent(event)
-            
+
             // 2. Upgrade to Sticky ACTIVE (Rule 2) via the foreground service so
             //    the radio survives backgrounding while the report propagates.
             meshController.setPowerState(MeshPowerState.ACTIVE, isSticky = true)
@@ -126,9 +155,7 @@ class ReportViewModel @Inject constructor(
             nearbySyncManager.startProximityWave()
 
             // 4. Broadcast to nearby peers immediately
-            val isAnonymous = user?.isAnonymous ?: false
-            val protoEvent = domainToProto(event, isAnonymous)
-            nearbySyncManager.broadcastIncident(protoEvent)
+            nearbySyncManager.broadcastIncident(signed)
         }
     }
 
@@ -157,8 +184,8 @@ class ReportViewModel @Inject constructor(
         }
     }
 
-    private fun domainToProto(event: Event, isAnonymous: Boolean = false): PigeonEvent {
-        val protoType = when (event.eventType) {
+    private fun domainEventTypeToProto(type: EventType): com.example.pigeon.proto.EventType =
+        when (type) {
             EventType.FIRE -> com.example.pigeon.proto.EventType.FIRE
             EventType.MEDICAL -> com.example.pigeon.proto.EventType.MEDICAL
             EventType.SUPPLIES -> com.example.pigeon.proto.EventType.RESOURCE
@@ -166,18 +193,4 @@ class ReportViewModel @Inject constructor(
             EventType.CUSTOM -> com.example.pigeon.proto.EventType.CUSTOM
             EventType.SOS -> com.example.pigeon.proto.EventType.SOS
         }
-        return PigeonEvent.newBuilder()
-            .setEventId(event.eventId)
-            .setEventType(protoType)
-            .setDescription(event.description)
-            .setLatitude(event.latitude)
-            .setLongitude(event.longitude)
-            .setTimestamp(event.timestamp)
-            .setCreatorDeviceId(event.creatorDeviceId)
-            .setIsResolved(event.isResolved)
-            .setCreatorName(if (isAnonymous) "Anonymous Civilian" else event.creatorName)
-            .setTitle(event.title)
-            .setExpiryTimestamp(event.expiryTimestamp)
-            .build()
-    }
 }

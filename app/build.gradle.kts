@@ -128,6 +128,12 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.work.compiler)
+
+    // Identity / crypto — Ed25519 signatures + EncryptedSharedPreferences for the
+    // private key. BouncyCastle is used on all API levels so Ed25519 behaves the
+    // same on minSdk 26 (where the platform JCA lacks Ed25519) and API 33+.
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.bouncycastle.bcprov)
 }
 
 protobuf {

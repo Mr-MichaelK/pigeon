@@ -46,7 +46,13 @@ fun MeshBottomNav(navController: NavController) {
         val currentDestination = navBackStackEntry?.destination
 
         items.forEach { item ->
-            val isSelected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+            // Strip query/path args before comparing — the Map destination's
+            // route is the full template "map?eventId={eventId}", which never
+            // equals the bare "map" sentinel here. substringBefore('?') /
+            // substringBefore('/') normalizes both sides of the check.
+            val isSelected = currentDestination?.hierarchy?.any {
+                it.route?.substringBefore('?')?.substringBefore('/') == item.route
+            } == true
             
             NavigationBarItem(
                 icon = { Icon(item.icon, contentDescription = item.title) },

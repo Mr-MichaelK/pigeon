@@ -446,6 +446,9 @@ private fun getRequiredNearbyPermissions(): Array<String> {
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        // Bundled with mesh perms so the foreground-service notification can
+        // actually post — without runtime grant on SDK 33+ it's silently filtered.
+        permissions.add(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     return permissions.toTypedArray()

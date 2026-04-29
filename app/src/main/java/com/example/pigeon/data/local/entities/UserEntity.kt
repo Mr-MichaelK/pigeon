@@ -19,7 +19,7 @@ data class UserEntity(
     val nodeId: String = "",
     val isVerified: Boolean = false,
     val totalSyncs: Int = 0,
-    val trustScore: Float = 100.0f,
+    val trustScore: Float = 0.0f,
     val lastUpdatedTimestamp: Long
 )
 

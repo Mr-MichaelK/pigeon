@@ -20,7 +20,9 @@ import com.example.pigeon.proto.SyncManifest
 import com.example.pigeon.proto.VerificationMessage
 import com.example.pigeon.data.local.dao.VerificationDao
 import com.example.pigeon.data.local.entities.VerificationEntity
+import com.example.pigeon.data.identity.IdentityKeyManager
 import com.google.android.gms.nearby.Nearby
+import com.google.protobuf.ByteString
 import kotlinx.coroutines.Job
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
@@ -53,7 +55,8 @@ class NearbySyncManagerImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val eventRepository: com.example.pigeon.domain.repository.EventRepository,
     private val verificationDao: VerificationDao,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val identityKeyManager: IdentityKeyManager
 ) : NearbySyncManager {
 
     private val TAG = "[MESH_RADIO]"
@@ -650,10 +653,18 @@ class NearbySyncManagerImpl @Inject constructor(
     }
 
     private suspend fun pushEventToPeer(endpointId: String, event: Event) {
+        // Distributed Trust gate: never put unsigned bytes on the wire.
+        // Legacy/mock rows have empty signature/publicKey and would be rejected by
+        // the receiver anyway — drop them locally so the radio doesn't burn cycles
+        // sending payloads that downstream peers will silently discard.
+        if (event.signature.isEmpty() || event.creatorPublicKey.isEmpty()) {
+            Log.d(TAG, "Skipping push of unsigned event ${event.eventId} (mock/legacy row).")
+            return
+        }
         val protoEvent = domainToProto(event)
         val pigeonPayload = PigeonPayload.newBuilder().setEvent(protoEvent).build()
         val payload = Payload.fromBytes(pigeonPayload.toByteArray())
-        
+
         if (endpointId == MOCK_PEER_ID) {
             Log.d(TAG, "[MOCK] Would push event ${event.eventId} to $endpointId")
         } else {
@@ -665,18 +676,39 @@ class NearbySyncManagerImpl @Inject constructor(
 
     private fun pushVerificationToPeer(endpointId: String, entity: VerificationEntity) {
         if (endpointId == MOCK_PEER_ID) return
+        // Same egress gate as pushEventToPeer — silently drop legacy unsigned rows.
+        if (entity.signature.isEmpty() || entity.signerPublicKey.isEmpty()) {
+            Log.d(TAG, "Skipping push of unsigned verification ${entity.id} (legacy row).")
+            return
+        }
         val msg = VerificationMessage.newBuilder()
             .setId(entity.id)
             .setEventId(entity.eventId)
             .setSignerId(entity.signerId)
             .setIsConfirm(entity.isConfirm)
             .setTimestamp(entity.timestamp)
+            .setSignerPublicKey(ByteString.copyFrom(entity.signerPublicKey))
+            .setSignature(ByteString.copyFrom(entity.signature))
             .build()
         val payload = PigeonPayload.newBuilder().setVerification(msg).build()
         connectionsClient.sendPayload(endpointId, Payload.fromBytes(payload.toByteArray()))
     }
 
     private suspend fun handleReceivedEvent(endpointId: String, protoEvent: PigeonEvent) {
+        // Distributed Trust gate: drop unsigned or invalid-signature events. The
+        // verifier checks (a) presence of pubkey + signature, (b) SHA-256(pubkey)
+        // matches creatorDeviceId, (c) Ed25519 signature is valid over the canonical
+        // bytes. Any failure here means the message was forged, tampered, or sent
+        // by a peer running pre-trust code — none of which we trust.
+        if (!identityKeyManager.verifyPigeonEvent(protoEvent)) {
+            Log.w(TAG, "🚫 Dropping event ${protoEvent.eventId} from $endpointId — signature invalid or missing.")
+            // Still remove it from expectedIds so the session can complete; otherwise
+            // a single bad event would hold the sync window open until the wave times out.
+            syncStates[endpointId]?.expectedIds?.remove(protoEvent.eventId)
+            checkSyncCompletion(endpointId)
+            return
+        }
+
         val domainEvent = protoToDomain(protoEvent)
         eventRepository.createEvent(domainEvent)
 
@@ -686,7 +718,7 @@ class NearbySyncManagerImpl @Inject constructor(
         state?.expectedIds?.remove(protoEvent.eventId)
         state?.receivedNewEvent = true
 
-        Log.d(TAG, "Upserted event ${domainEvent.eventId}. Remaining expected: ${state?.expectedIds?.size ?: 0}")
+        Log.d(TAG, "✓ Upserted signed event ${domainEvent.eventId}. Remaining expected: ${state?.expectedIds?.size ?: 0}")
 
         // Do NOT call startProximityWave() here — it calls stop() which kills the
         // active sync session for PASSIVE nodes. Relay wave fires in checkSyncCompletion
@@ -695,15 +727,21 @@ class NearbySyncManagerImpl @Inject constructor(
     }
 
     private suspend fun handleReceivedVerification(endpointId: String, msg: VerificationMessage) {
+        if (!identityKeyManager.verifyVerificationMessage(msg)) {
+            Log.w(TAG, "🚫 Dropping verification ${msg.id} from $endpointId — signature invalid or missing.")
+            return
+        }
         val entity = VerificationEntity(
             id = msg.id,
             eventId = msg.eventId,
             signerId = msg.signerId,
             isConfirm = msg.isConfirm,
-            timestamp = msg.timestamp
+            timestamp = msg.timestamp,
+            signerPublicKey = msg.signerPublicKey.toByteArray(),
+            signature = msg.signature.toByteArray()
         )
         verificationDao.insertVerification(entity)
-        Log.d(TAG, "Upserted verification for ${msg.eventId} from ${msg.signerId}")
+        Log.d(TAG, "✓ Upserted signed verification for ${msg.eventId} from ${msg.signerId.take(12)}…")
         // Relay wave fires in checkSyncCompletion — not here, to avoid killing live sessions.
     }
 
@@ -759,6 +797,10 @@ class NearbySyncManagerImpl @Inject constructor(
             EventType.CUSTOM -> com.example.pigeon.proto.EventType.CUSTOM
             EventType.SOS -> com.example.pigeon.proto.EventType.SOS
         }
+        // Re-broadcast path: rebuild the proto with the *original* signature
+        // bytes from the persisted entity. We are NOT the signer for forwarded
+        // events, so we cannot re-sign — only the creator can. Receivers
+        // verify against the creator's public key, also carried on the wire.
         return PigeonEvent.newBuilder()
             .setEventId(event.eventId)
             .setEventType(protoType)
@@ -771,6 +813,8 @@ class NearbySyncManagerImpl @Inject constructor(
             .setCreatorName(event.creatorName)
             .setTitle(event.title)
             .setExpiryTimestamp(event.expiryTimestamp)
+            .setCreatorPublicKey(ByteString.copyFrom(event.creatorPublicKey))
+            .setSignature(ByteString.copyFrom(event.signature))
             .build()
     }
 
@@ -808,7 +852,12 @@ class NearbySyncManagerImpl @Inject constructor(
             isResolved = proto.isResolved,
             creatorName = proto.creatorName,
             ttl = sanitizedExpiry - proto.timestamp,
-            expiryTimestamp = sanitizedExpiry
+            expiryTimestamp = sanitizedExpiry,
+            // Persist the on-wire signature so the manifest re-broadcast path
+            // (pushEventToPeer / domainToProto) can resend it intact to the
+            // next hop. Already verified above before this function is called.
+            creatorPublicKey = proto.creatorPublicKey.toByteArray(),
+            signature = proto.signature.toByteArray()
         )
     }
 
