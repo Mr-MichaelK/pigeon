@@ -1,17 +1,20 @@
 package com.example.pigeon.data.service
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.example.pigeon.MainActivity
@@ -60,6 +63,12 @@ class MeshService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
         val action = intent?.action
         Log.d(TAG, "onStartCommand action=$action stickyRestart=${intent == null}")
+
+        // Re-assert the foreground type each command. If the user grants
+        // ACCESS_FINE_LOCATION between onCreate and now, this is what upgrades
+        // the FGS to include the LOCATION capability so BLE scans stop failing
+        // with 8034 once the screen turns off.
+        startInForeground(buildNotification("Pigeon Mesh Active", "Searching for nearby peers..."))
 
         if (intent == null) {
             // Process restart after START_STICKY — restore the persisted state so the
@@ -212,12 +221,35 @@ class MeshService : LifecycleService() {
     }
 
     private fun startInForeground(notification: Notification) {
+        // LOCATION type is required alongside CONNECTED_DEVICE: Nearby Connections'
+        // BLE scan path goes through AppOps' location OP, which on Android 14+
+        // returns IGNORE for backgrounded FGS that lack the location capability —
+        // discovery then fails with 8034 the moment the screen turns off.
+        //
+        // Catch: starting an FGS with TYPE_LOCATION throws SecurityException if
+        // ACCESS_FINE/COARSE_LOCATION isn't runtime-granted yet — which is the
+        // case on first launch (we kick MeshService from MainActivity.onCreate
+        // before the perm prompt has run). Fall back to CONNECTED_DEVICE-only
+        // when the perm is missing; onStartCommand re-calls this on every
+        // action, so the upgrade to the location-capable type happens
+        // automatically once the user grants the permission and triggers any
+        // state change.
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            var bits = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            if (hasLocationPermission()) {
+                bits = bits or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            }
+            bits
         } else {
             0
         }
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 
     private fun updateNotification(title: String, body: String) {
