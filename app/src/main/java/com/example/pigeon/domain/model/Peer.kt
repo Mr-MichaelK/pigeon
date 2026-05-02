@@ -8,10 +8,14 @@ data class Peer(
     val deviceId: String,
     val callsign: String,
     val connectionType: ConnectionType,
-    val rssi: Int, // Signal strength in dBm (e.g., -60)
-    val physicalDistance: Float, // Calculated distance in meters
-    val normalizedDistance: Float, // 0.0 to 1.0 for UI rendering
-    val syncProgress: Float, // 0.0 to 1.0
-    val lastSeen: Long, // Timestamp
-    var isConnected: Boolean = false
+    val syncProgress: Float,
+    val lastSeen: Long,
+    var isConnected: Boolean = false,
+    // Last known geographic position reported by the peer over a connected
+    // Nearby link (PeerInfo proto message). Null until the peer has both
+    // (a) acquired a LOCKED fix on their side and (b) sent us a PeerInfo.
+    // Drives radar bearing/distance — peers without lat/lng aren't drawn on
+    // the dial, only listed below.
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )

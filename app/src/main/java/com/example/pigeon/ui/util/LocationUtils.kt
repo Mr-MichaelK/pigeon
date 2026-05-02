@@ -30,6 +30,26 @@ object LocationUtils {
     }
 
     /**
+     * Forward-azimuth (initial bearing) from point 1 to point 2, in degrees
+     * clockwise from true north (0 = N, 90 = E, 180 = S, 270 = W).
+     *
+     * Used by the radar dial to place each peer at their real direction
+     * relative to the local user. The result is normalized into [0, 360).
+     */
+    fun calculateBearing(
+        lat1: Double, lon1: Double,
+        lat2: Double, lon2: Double
+    ): Double {
+        val phi1 = lat1 * PI / 180.0
+        val phi2 = lat2 * PI / 180.0
+        val deltaLambda = (lon2 - lon1) * PI / 180.0
+        val y = sin(deltaLambda) * cos(phi2)
+        val x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(deltaLambda)
+        val theta = atan2(y, x)
+        return ((theta * 180.0 / PI) + 360.0) % 360.0
+    }
+
+    /**
      * Checks if a user is within a specified radius (in meters) of an event.
      */
     fun isWithinRange(

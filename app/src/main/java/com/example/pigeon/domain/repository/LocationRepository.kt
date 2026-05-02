@@ -6,7 +6,13 @@ import kotlinx.coroutines.flow.StateFlow
 import org.maplibre.android.geometry.LatLng
 
 interface LocationRepository {
-    val userLocation: Flow<LatLng?>
+    /**
+     * Exposed as StateFlow (not bare Flow) so callers that need the current
+     * value synchronously — e.g. NearbySyncManagerImpl on a connection-success
+     * callback, deciding whether to broadcast a PeerInfo — can read .value
+     * without a coroutine. Existing flow-collecting call sites work unchanged.
+     */
+    val userLocation: StateFlow<LatLng?>
     val gpsAccuracy: Flow<Float?>
     val locationQuality: Flow<LocationQuality>
     /** Wall-clock millis at which "locating" started, or null when LOCKED. */

@@ -828,12 +828,16 @@ private fun setupMapStyle(
     style.addImage("pin-conflict", conflictPin)
     style.addImage("pin-custom", customPin)
 
-    // Register faded variants (40% alpha)
-    style.addImage("pin-fire-faded", createFadedBitmap(firePin, 102))
-    style.addImage("pin-medical-faded", createFadedBitmap(medicalPin, 102))
-    style.addImage("pin-supplies-faded", createFadedBitmap(suppliesPin, 102))
-    style.addImage("pin-conflict-faded", createFadedBitmap(conflictPin, 102))
-    style.addImage("pin-custom-faded", createFadedBitmap(customPin, 102))
+    // Verified variants — base pin wrapped in a SuccessGreen outer ring so
+    // events that have cleared the trust threshold (≥3 confirms, ≥80% confirm
+    // ratio in VerificationRepositoryImpl) read at a glance during an emergency.
+    // Replaces the older "fade unverified" approach: positive signal on the
+    // trustworthy side, plain base on the rest.
+    style.addImage("pin-fire-verified", createVerifiedPinFromBase(firePin))
+    style.addImage("pin-medical-verified", createVerifiedPinFromBase(medicalPin))
+    style.addImage("pin-supplies-verified", createVerifiedPinFromBase(suppliesPin))
+    style.addImage("pin-conflict-verified", createVerifiedPinFromBase(conflictPin))
+    style.addImage("pin-custom-verified", createVerifiedPinFromBase(customPin))
 
     defaultPin?.let { style.addImage("default-pin", it) }
 
@@ -971,7 +975,7 @@ private fun updateSymbols(
                 EventType.CUSTOM, EventType.SOS -> "pin-custom"
             }
             
-            val iconImage = if (isVerified) iconBase else "$iconBase-faded"
+            val iconImage = if (isVerified) "$iconBase-verified" else iconBase
 
             manager?.create(
                 SymbolOptions()
@@ -984,13 +988,40 @@ private fun updateSymbols(
     }
 }
 
-private fun createFadedBitmap(src: Bitmap, alpha: Int): Bitmap {
-    val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+/**
+ * Wraps a base 120 px tactical pin in a SuccessGreen outer ring on a 140 px
+ * canvas. The base pin keeps its own size and stroke — the verified ring sits
+ * just outside the white border so the type-color body of the pin remains the
+ * primary visual. The 8 px ring matches the weight of the existing white
+ * border (6 px) so the pin still reads as a single unit, not a sticker.
+ *
+ * Color is the existing `MeshColor.SuccessGreen` (#16A34A) — same green tone
+ * as the rest of the primary palette (sweep "active" indicator, peer-list
+ * sync progress) so the verified state lands as part of the design system,
+ * not an out-of-tune accent.
+ */
+private fun createVerifiedPinFromBase(basePin: Bitmap): Bitmap {
+    val baseSize = basePin.width // 120
+    val ringWidth = 8f
+    val gapToRing = 1f          // hairline transparent buffer between white border and green ring
+    val canvasSize = baseSize + ((ringWidth + gapToRing) * 2f).toInt()
+    val out = Bitmap.createBitmap(canvasSize, canvasSize, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(out)
+
+    // Center the base pin on the larger canvas.
+    val baseOffset = (canvasSize - baseSize) / 2f
+    canvas.drawBitmap(basePin, baseOffset, baseOffset, null)
+
+    // Draw the verified ring centered in the gap region. The ring's centerline
+    // sits at radius (baseSize/2 + gapToRing + ringWidth/2) from canvas center.
+    val center = canvasSize / 2f
+    val ringRadius = (baseSize / 2f) + gapToRing + (ringWidth / 2f)
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        this.alpha = alpha
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = ringWidth
+        color = MeshColor.SuccessGreen.toArgb()
     }
-    canvas.drawBitmap(src, 0f, 0f, paint)
+    canvas.drawCircle(center, center, ringRadius, paint)
     return out
 }
 

@@ -31,7 +31,7 @@ class LocationRepositoryImpl @Inject constructor(
     private val TAG = "[GPS]"
 
     private val _userLocation = MutableStateFlow<LatLng?>(null)
-    override val userLocation: Flow<LatLng?> = _userLocation.asStateFlow()
+    override val userLocation: kotlinx.coroutines.flow.StateFlow<LatLng?> = _userLocation.asStateFlow()
 
     private val _gpsAccuracy = MutableStateFlow<Float?>(null)
     override val gpsAccuracy: Flow<Float?> = _gpsAccuracy.asStateFlow()
@@ -54,6 +54,35 @@ class LocationRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Drive the LocationQuality state machine, but suppress LOCKED→COARSE
+     * downgrades that come from fallback paths (stale-fused / GPS_PROVIDER).
+     *
+     * Without this gate, every fallback fix at 30–50 m accuracy would call
+     * classify() and demote LOCKED → COARSE, then a sub-15 m GPS poke would
+     * promote back, producing the every-few-seconds quality flicker the user
+     * sees on phones with mixed GPS/WiFi positioning.
+     *
+     * Rule: a fix may downgrade quality only if it passed the primary
+     * accuracy gate (≤ ACCURACY_THRESHOLD_M = 20 m), OR if the primary gate
+     * hasn't fired for QUALITY_DOWNGRADE_TIMEOUT_MS (30 s) — at which point
+     * the user has genuinely been without high-accuracy positioning long
+     * enough that the indicator should reflect it.
+     */
+    private fun maybeUpdateQuality(accuracyMeters: Float, primaryGated: Boolean) {
+        if (primaryGated) lastPrimaryGateElapsed = SystemClock.elapsedRealtime()
+        val sincePrimary = SystemClock.elapsedRealtime() - lastPrimaryGateElapsed
+        val allowDowngrade = sincePrimary >= QUALITY_DOWNGRADE_TIMEOUT_MS
+        if (primaryGated || allowDowngrade) {
+            _locationQuality.value = classify(accuracyMeters, _locationQuality.value)
+            updateLocatingTimer(_locationQuality.value)
+        } else {
+            Log.d(TAG, "Quality update suppressed — fallback fix acc=${accuracyMeters}m, " +
+                    "${sincePrimary}ms since last primary-gate fix " +
+                    "(need ≥${QUALITY_DOWNGRADE_TIMEOUT_MS}ms to allow downgrade).")
+        }
+    }
+
     private val fusedClient = LocationServices.getFusedLocationProviderClient(context)
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
@@ -68,6 +97,13 @@ class LocationRepositoryImpl @Inject constructor(
     // Monotonic timestamp of the last fix that passed isFresh() AND the
     // accuracy filter — used to decide when the GPS fallback should take over.
     private var lastValidFusedElapsed = 0L
+
+    // Monotonic timestamp of the last fix that passed the PRIMARY accuracy
+    // gate (≤ ACCURACY_THRESHOLD_M). Distinct from lastValidFusedElapsed,
+    // which is also bumped by stale-fallback acceptances. Quality downgrades
+    // out of LOCKED are suppressed until QUALITY_DOWNGRADE_TIMEOUT_MS has
+    // elapsed since this timestamp — see maybeUpdateQuality().
+    private var lastPrimaryGateElapsed = 0L
 
     override fun updateLocation(location: LatLng) {
         _userLocation.value = location
@@ -108,8 +144,7 @@ class LocationRepositoryImpl @Inject constructor(
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 _gpsAccuracy.value = location.accuracy
                 _userLocation.value = LatLng(location.latitude, location.longitude)
-                _locationQuality.value = classify(location.accuracy, _locationQuality.value)
-                updateLocatingTimer(_locationQuality.value)
+                maybeUpdateQuality(location.accuracy, primaryGated = location.accuracy <= ACCURACY_THRESHOLD_M)
             } else {
                 Log.d(TAG, "Seed rejected — age=${ageMs}ms acc=${location.accuracy}m " +
                         "(limits: age≤${SEED_MAX_AGE_MS}ms acc≤${SEED_MAX_ACCURACY_M}m).")
@@ -190,8 +225,7 @@ class LocationRepositoryImpl @Inject constructor(
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 lastValidFusedElapsed = SystemClock.elapsedRealtime()
                 _userLocation.value = LatLng(location.latitude, location.longitude)
-                _locationQuality.value = classify(location.accuracy, _locationQuality.value)
-                updateLocatingTimer(_locationQuality.value)
+                maybeUpdateQuality(location.accuracy, primaryGated = passesAccuracyGate)
             }
         }
 
@@ -229,8 +263,7 @@ class LocationRepositoryImpl @Inject constructor(
                 Log.d(TAG, "GPS fallback accepted — fused silent ${fusedSilentMs}ms, acc=${location.accuracy}m")
                 lastAcceptedElapsed = SystemClock.elapsedRealtime()
                 _userLocation.value = LatLng(location.latitude, location.longitude)
-                _locationQuality.value = classify(location.accuracy, _locationQuality.value)
-                updateLocatingTimer(_locationQuality.value)
+                maybeUpdateQuality(location.accuracy, primaryGated = location.accuracy <= ACCURACY_THRESHOLD_M)
             } else {
                 val ageMs = (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000L
                 Log.d(TAG, "GPS fallback skipped — fusedSilent=${fusedSilentMs}ms acc=${location.accuracy}m age=${ageMs}ms.")
@@ -336,5 +369,13 @@ class LocationRepositoryImpl @Inject constructor(
         // G85 GPS chipset and prevents the visible LOCKED↔COARSE flicker.
         private const val LOCKED_THRESHOLD_M = 15f
         private const val LOCKED_RELEASE_M = 25f
+
+        // LOCKED stickiness against fallback paths. A stale-fallback fused
+        // fix or GPS_PROVIDER fallback fix at 30–50 m must not demote LOCKED
+        // unless we've been without a primary-gate-quality fix for at least
+        // this long. Tuned long enough to ride out a 10–20 s tunnel/indoors
+        // dip, short enough that the indicator does eventually reflect a
+        // sustained loss of high-accuracy positioning.
+        private const val QUALITY_DOWNGRADE_TIMEOUT_MS = 30_000L
     }
 }
