@@ -45,7 +45,11 @@ import com.example.pigeon.domain.model.ConnectionType
 import com.example.pigeon.domain.model.MeshPowerState
 import com.example.pigeon.domain.model.Peer
 import com.example.pigeon.ui.theme.MeshColor
+import com.example.pigeon.ui.util.LocationUtils
+import org.maplibre.android.geometry.LatLng
+import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -137,6 +141,7 @@ fun RadarScreen(
             ) {
                 RadarCanvas(
                     activePeers = uiState.activePeers,
+                    userLocation = uiState.userLocation,
                     powerState = uiState.powerState,
                     sweepAngle = sweepAngle
                 )
@@ -148,7 +153,8 @@ fun RadarScreen(
         // Peer List
         PeerListSection(
             activePeers = uiState.activePeers,
-            historicalPeers = uiState.historicalPeers
+            historicalPeers = uiState.historicalPeers,
+            userLocation = uiState.userLocation
         )
     }
 }
@@ -198,16 +204,24 @@ fun PowerStateToggle(
     }
 }
 
+/**
+ * Outer ring of the radar represents this many meters from the local user.
+ * Peers farther than this are clamped to the rim — keeps far peers visible
+ * without compressing the inner-radius detail where most peers actually live.
+ */
+private const val RADAR_MAX_RANGE_M = 200.0
+
 @Composable
 fun RadarCanvas(
     activePeers: List<Peer>,
+    userLocation: LatLng?,
     powerState: MeshPowerState,
     sweepAngle: Float
 ) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val center = Offset(size.width / 2, size.height / 2)
         val maxRadius = size.width / 2
-        
+
         // Draw Rings
         for (i in 1..3) {
             drawCircle(
@@ -216,36 +230,54 @@ fun RadarCanvas(
                 style = Stroke(width = 1.dp.toPx())
             )
         }
-        
+
         if (powerState != MeshPowerState.OFF) {
             // Draw Sweep
             val sweepColor = if (powerState == MeshPowerState.ACTIVE) MeshColor.Primary else MeshColor.TextSecondary
-            
+
             // Not truly implementing a sweep gradient for simplicity, using a rotating line
             val sweepRad = Math.toRadians(sweepAngle.toDouble())
             val endX = center.x + maxRadius * cos(sweepRad).toFloat()
             val endY = center.y + maxRadius * sin(sweepRad).toFloat()
-            
+
             drawLine(
                 color = sweepColor.copy(alpha = 0.5f),
                 start = center,
                 end = Offset(endX, endY),
                 strokeWidth = 2.dp.toPx()
             )
-            
-            // Draw Peers
+
+            // Draw Peers at their real bearing/distance from the local user.
+            // A peer is only drawable on the dial when (a) we have our own
+            // fix (userLocation != null) and (b) we've received a PeerInfo
+            // from them. Peers without lat/lng appear in the list below the
+            // canvas but not on the dial — that's intentional, drawing them
+            // somewhere arbitrary is what produced the original "random
+            // position" bug.
+            if (userLocation == null) return@Canvas
             activePeers.forEach { peer ->
-                // Using pre-calculated physical/normalized distance from Data Layer
-                val normalizedDist = peer.normalizedDistance
-                
-                // Random angle for visualization (in real app, would need bearing)
-                // Using hash of ID to keep position stable
-                val angle = (peer.deviceId.hashCode() % 360).toDouble()
-                val rad = Math.toRadians(angle)
-                
-                val peerX = center.x + (maxRadius * normalizedDist) * cos(rad).toFloat()
-                val peerY = center.y + (maxRadius * normalizedDist) * sin(rad).toFloat()
-                
+                val pLat = peer.latitude ?: return@forEach
+                val pLng = peer.longitude ?: return@forEach
+
+                val distM = LocationUtils.calculateDistance(
+                    userLocation.latitude, userLocation.longitude,
+                    pLat, pLng
+                )
+                val bearingDeg = LocationUtils.calculateBearing(
+                    userLocation.latitude, userLocation.longitude,
+                    pLat, pLng
+                )
+
+                // Map bearing (0° = N, clockwise) onto canvas (0° = +x, CCW
+                // in math but +y points DOWN in screen coords). bearing - 90°
+                // puts north at the top of the dial.
+                val canvasRad = (bearingDeg - 90.0) * PI / 180.0
+                val radial = (distM / RADAR_MAX_RANGE_M).coerceIn(0.05, 0.97)
+                val r = maxRadius * radial
+
+                val peerX = center.x + (r * cos(canvasRad)).toFloat()
+                val peerY = center.y + (r * sin(canvasRad)).toFloat()
+
                 drawCircle(
                     color = MeshColor.Primary,
                     radius = 6.dp.toPx(),
@@ -259,7 +291,8 @@ fun RadarCanvas(
 @Composable
 fun PeerListSection(
     activePeers: List<Peer>,
-    historicalPeers: List<Peer>
+    historicalPeers: List<Peer>,
+    userLocation: LatLng?
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -276,11 +309,11 @@ fun PeerListSection(
                 )
             }
             items(activePeers) { peer ->
-                PeerListItem(peer = peer, isActive = true)
+                PeerListItem(peer = peer, isActive = true, userLocation = userLocation)
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-        
+
         if (historicalPeers.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -293,7 +326,7 @@ fun PeerListSection(
                 )
             }
             items(historicalPeers) { peer ->
-                PeerListItem(peer = peer, isActive = false)
+                PeerListItem(peer = peer, isActive = false, userLocation = userLocation)
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
@@ -301,7 +334,7 @@ fun PeerListSection(
 }
 
 @Composable
-fun PeerListItem(peer: Peer, isActive: Boolean) {
+fun PeerListItem(peer: Peer, isActive: Boolean, userLocation: LatLng?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -332,9 +365,9 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(12.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = peer.callsign,
@@ -343,12 +376,12 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
                     color = if (isActive) MeshColor.TextPrimary else MeshColor.TextSecondary
                 )
                 Text(
-                    text = "Signal: ${peer.rssi} dBm",
+                    text = peerSubtitle(peer, userLocation),
                     style = MaterialTheme.typography.bodySmall,
                     color = MeshColor.TextSecondary
                 )
             }
-            
+
             if (isActive && peer.syncProgress < 1.0f) {
                 CircularProgressIndicator(
                     progress = peer.syncProgress,
@@ -359,6 +392,37 @@ fun PeerListItem(peer: Peer, isActive: Boolean) {
             }
         }
     }
+}
+
+/**
+ * Replaces the old "Signal: -60 dBm" line. The dBm value was a hardcoded
+ * placeholder (GMS Nearby doesn't expose per-endpoint RSSI), so it was the
+ * same for every peer and conveyed nothing. We now show real distance +
+ * compass bearing when we have both lat/lngs, falling back to a connection
+ * status line otherwise.
+ */
+private fun peerSubtitle(peer: Peer, userLocation: LatLng?): String {
+    val pLat = peer.latitude
+    val pLng = peer.longitude
+    if (userLocation != null && pLat != null && pLng != null) {
+        val distM = LocationUtils.calculateDistance(
+            userLocation.latitude, userLocation.longitude, pLat, pLng
+        )
+        val bearingDeg = LocationUtils.calculateBearing(
+            userLocation.latitude, userLocation.longitude, pLat, pLng
+        )
+        val distLabel = if (distM < 1000.0) "${distM.roundToInt()} m"
+        else "${"%.1f".format(distM / 1000.0)} km"
+        return "$distLabel · ${compassPoint(bearingDeg)} (${bearingDeg.roundToInt()}°)"
+    }
+    return if (peer.isConnected) "Connected · location pending" else "Not connected"
+}
+
+private fun compassPoint(bearingDeg: Double): String {
+    // 8-point compass: each sector spans 45° centered on its cardinal/intercardinal.
+    val points = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+    val idx = (((bearingDeg + 22.5) % 360.0) / 45.0).toInt().coerceIn(0, 7)
+    return points[idx]
 }
 
 @Composable

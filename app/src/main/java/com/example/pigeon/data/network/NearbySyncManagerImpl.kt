@@ -13,11 +13,14 @@ import com.example.pigeon.domain.network.NearbySyncManager
 import com.example.pigeon.domain.model.Event
 import com.example.pigeon.domain.model.EventType
 import com.example.pigeon.domain.repository.UserRepository
+import com.example.pigeon.proto.PeerInfo
 import com.example.pigeon.proto.PigeonEvent
 import com.example.pigeon.proto.PigeonPayload
 import com.example.pigeon.proto.SyncItem
 import com.example.pigeon.proto.SyncManifest
 import com.example.pigeon.proto.VerificationMessage
+import com.example.pigeon.domain.repository.LocationRepository
+import com.example.pigeon.ui.util.LocationUtils
 import com.example.pigeon.data.local.dao.VerificationDao
 import com.example.pigeon.data.local.entities.VerificationEntity
 import com.example.pigeon.data.identity.IdentityKeyManager
@@ -56,7 +59,8 @@ class NearbySyncManagerImpl @Inject constructor(
     private val eventRepository: com.example.pigeon.domain.repository.EventRepository,
     private val verificationDao: VerificationDao,
     private val userRepository: UserRepository,
-    private val identityKeyManager: IdentityKeyManager
+    private val identityKeyManager: IdentityKeyManager,
+    private val locationRepository: LocationRepository
 ) : NearbySyncManager {
 
     private val TAG = "[MESH_RADIO]"
@@ -129,6 +133,17 @@ class NearbySyncManagerImpl @Inject constructor(
     // every device we've ever crossed paths with.
     private val PEER_TTL_MS = 5 * 60_000L
 
+    // Re-broadcast PeerInfo to connected peers only after the local position
+    // has moved past this many meters. Below the threshold we suppress the
+    // payload entirely — saves BLE airtime and avoids jittering peers' radar
+    // dots from sub-accuracy GPS noise. Tuned conservatively: a 10 m walk is
+    // visible on a 200 m radar, smaller drifts aren't.
+    private val PEER_INFO_RESEND_MIN_M = 10.0
+
+    // Last lat/lng we broadcasted in a PeerInfo. Used by the location-watcher
+    // coroutine to suppress sub-threshold updates. Null until the first send.
+    private var lastBroadcastedLocation: org.maplibre.android.geometry.LatLng? = null
+
     init {
         syncScope.launch {
             userRepository.getUser().collect { user ->
@@ -149,6 +164,63 @@ class NearbySyncManagerImpl @Inject constructor(
                 }
             }
         }
+        // Watch local location and re-broadcast PeerInfo to all connected
+        // peers when we move past PEER_INFO_RESEND_MIN_M. Without this, peers
+        // would only learn our position once at connection time and never
+        // see us move on their radar.
+        syncScope.launch {
+            locationRepository.userLocation.collect { loc ->
+                if (loc == null) return@collect
+                val last = lastBroadcastedLocation
+                val moved = last == null || LocationUtils.calculateDistance(
+                    last.latitude, last.longitude,
+                    loc.latitude, loc.longitude
+                ) >= PEER_INFO_RESEND_MIN_M
+                if (!moved) return@collect
+                lastBroadcastedLocation = loc
+                broadcastPeerInfoToConnectedPeers()
+            }
+        }
+    }
+
+    private fun broadcastPeerInfoToConnectedPeers() {
+        val loc = locationRepository.userLocation.value ?: return
+        val payload = PigeonPayload.newBuilder()
+            .setPeerInfo(
+                PeerInfo.newBuilder()
+                    .setCallsign(localAdvertiseName)
+                    .setLatitude(loc.latitude)
+                    .setLongitude(loc.longitude)
+                    .build()
+            )
+            .build()
+        val bytes = Payload.fromBytes(payload.toByteArray())
+        val targets = _nearbyPeers.value.filter { it.isConnected && it.deviceId != MOCK_PEER_ID }
+        if (targets.isEmpty()) return
+        Log.d(TAG, "Broadcasting PeerInfo (${loc.latitude}, ${loc.longitude}) to ${targets.size} connected peer(s)")
+        for (peer in targets) {
+            connectionsClient.sendPayload(peer.deviceId, bytes)
+        }
+    }
+
+    private fun sendPeerInfoTo(endpointId: String) {
+        if (endpointId == MOCK_PEER_ID) return
+        val loc = locationRepository.userLocation.value ?: return
+        val payload = PigeonPayload.newBuilder()
+            .setPeerInfo(
+                PeerInfo.newBuilder()
+                    .setCallsign(localAdvertiseName)
+                    .setLatitude(loc.latitude)
+                    .setLongitude(loc.longitude)
+                    .build()
+            )
+            .build()
+        val bytes = Payload.fromBytes(payload.toByteArray())
+        Log.d(TAG, "Sending PeerInfo (${loc.latitude}, ${loc.longitude}) to $endpointId")
+        connectionsClient.sendPayload(endpointId, bytes)
+        // Treat the directed send as a broadcast for purposes of the move-threshold
+        // gate — otherwise a connect-then-tiny-drift would re-broadcast immediately.
+        lastBroadcastedLocation = loc
     }
 
     // ── Duty Cycle ────────────────────────────────────────────────────────────
@@ -262,14 +334,10 @@ class NearbySyncManagerImpl @Inject constructor(
                     _nearbyPeers.update { currentPeers ->
                         if (currentPeers.none { it.deviceId == endpointId }) {
                             // Peer not yet tracked (safety net for unexpected inbound connections)
-                            val rssi = -60
                             currentPeers + Peer(
                                 deviceId = endpointId,
                                 callsign = endpointId,
                                 connectionType = ConnectionType.BLE,
-                                rssi = rssi,
-                                physicalDistance = calculatePhysicalDistance(rssi),
-                                normalizedDistance = normalizeDistanceForRadar(calculatePhysicalDistance(rssi)),
                                 syncProgress = 0f,
                                 lastSeen = System.currentTimeMillis(),
                                 isConnected = true
@@ -282,6 +350,12 @@ class NearbySyncManagerImpl @Inject constructor(
                             }
                         }
                     }
+
+                    // Send our PeerInfo (callsign + lat/lng) so the remote can place us
+                    // on their radar dial. Only fires if we have a current location;
+                    // otherwise the remote keeps us off-dial until we move into range
+                    // of a fix and the location-watcher broadcast picks us up.
+                    sendPeerInfoTo(endpointId)
 
                     // Both sides always initiate sync — removes the asymmetry where
                     // only ACTIVE sent a manifest. Previously, if the broadcaster's
@@ -362,15 +436,10 @@ class NearbySyncManagerImpl @Inject constructor(
                 it.callsign == endpointName && !it.isConnected && it.deviceId != endpointId
             }
             if (deduped.none { it.deviceId == endpointId }) {
-                val rssi = -60
-                val dist = calculatePhysicalDistance(rssi)
                 deduped + Peer(
                     deviceId = endpointId,
                     callsign = endpointName,
                     connectionType = ConnectionType.BLE,
-                    rssi = rssi,
-                    physicalDistance = dist,
-                    normalizedDistance = normalizeDistanceForRadar(dist),
                     syncProgress = 0f,
                     lastSeen = System.currentTimeMillis(),
                     isConnected = false
@@ -392,10 +461,11 @@ class NearbySyncManagerImpl @Inject constructor(
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: com.google.android.gms.nearby.connection.DiscoveredEndpointInfo) {
-            // Capture baseline RSSI if available, otherwise default to -60dBm for calculation
-            // Note: RSSI is not always exposed in standard connection callbacks, but we implement the hook here.
-            val rssi = -60 // Baseline fallback
-            processEndpointFound(endpointId, info.endpointName, rssi)
+            // GMS Nearby Connections doesn't expose per-endpoint RSSI through
+            // DiscoveredEndpointInfo, so we don't try to fake one here. The peer's
+            // real position arrives later via the PeerInfo payload exchanged after
+            // the connection completes.
+            processEndpointFound(endpointId, info.endpointName)
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -406,19 +476,13 @@ class NearbySyncManagerImpl @Inject constructor(
         }
     }
 
-    private fun processEndpointFound(endpointId: String, endpointName: String, rssi: Int) {
-        val physicalDist = calculatePhysicalDistance(rssi)
-        val uiDist = normalizeDistanceForRadar(physicalDist)
-        
-        Log.d(TAG, "📡 Radar Update: Peer $endpointId signal is ${rssi}dBm (~${String.format("%.1f", physicalDist)} meters).")
+    private fun processEndpointFound(endpointId: String, endpointName: String) {
+        Log.d(TAG, "📡 Radar Update: Peer $endpointId ($endpointName) discovered.")
 
         val newPeer = Peer(
             deviceId = endpointId,
             callsign = endpointName,
             connectionType = ConnectionType.BLE,
-            rssi = rssi,
-            physicalDistance = physicalDist,
-            normalizedDistance = uiDist,
             syncProgress = 0f,
             lastSeen = System.currentTimeMillis(),
             isConnected = false
@@ -591,6 +655,11 @@ class NearbySyncManagerImpl @Inject constructor(
                     pigeonPayload.hasVerification() -> {
                         Log.d(TAG, "Received VerificationMessage from $endpointId for event ${pigeonPayload.verification.eventId}")
                         handleReceivedVerification(endpointId, pigeonPayload.verification)
+                    }
+                    pigeonPayload.hasPeerInfo() -> {
+                        val info = pigeonPayload.peerInfo
+                        Log.d(TAG, "Received PeerInfo from $endpointId: callsign=${info.callsign} loc=(${info.latitude}, ${info.longitude})")
+                        handleReceivedPeerInfo(endpointId, info)
                     }
                     else -> {
                         Log.w(TAG, "Received unknown payload type from $endpointId")
@@ -891,9 +960,8 @@ class NearbySyncManagerImpl @Inject constructor(
     }
 
     override fun simulateNearbyPeerFound() {
-        val simulatedRssi = (-70..-45).random()
-        Log.d(TAG, "Manual simulation triggered for $MOCK_PEER_ID with RSSI $simulatedRssi")
-        processEndpointFound(MOCK_PEER_ID, MOCK_PEER_NAME, simulatedRssi)
+        Log.d(TAG, "Manual simulation triggered for $MOCK_PEER_ID")
+        processEndpointFound(MOCK_PEER_ID, MOCK_PEER_NAME)
     }
 
     private fun hasRequiredPermissions(): Boolean {
@@ -1215,22 +1283,26 @@ class NearbySyncManagerImpl @Inject constructor(
         _nearbyPeers.update { peers -> peers.map { it.copy(isConnected = false) } }
     }
 
-    /**
-     * Physical Distance Formula:
-     * Distance = 10 ^ ((MeasuredRSSI - ReferenceRSSI) / (-10 * PathLossExponent))
-     * Ref: -50 dBm @ 1m, PathLossExponent: 2.5
-     */
-    private fun calculatePhysicalDistance(rssi: Int): Float {
-        val refRssi = -50.0
-        val n = 2.5
-        return Math.pow(10.0, (rssi.toDouble() - refRssi) / (-10.0 * n)).toFloat()
-    }
-
-    /**
-     * Maps physical distance (0-50m) to UI radius (0.0-1.0)
-     */
-    private fun normalizeDistanceForRadar(meters: Float): Float {
-        val maxDisplayRange = 50f
-        return (meters / maxDisplayRange).coerceIn(0.1f, 0.95f)
+    private fun handleReceivedPeerInfo(endpointId: String, info: PeerInfo) {
+        // Validate before applying. Empty/zero coordinates can occur if the
+        // remote sent before its own location locked — we don't want to render
+        // the peer at "null island" in the South Atlantic. Latitude 0 / lng 0
+        // with no other signal is ~always a bug, so skip.
+        if (info.latitude == 0.0 && info.longitude == 0.0) {
+            Log.w(TAG, "PeerInfo from $endpointId has zeroed coords — ignoring.")
+            return
+        }
+        _nearbyPeers.update { currentPeers ->
+            currentPeers.map { peer ->
+                if (peer.deviceId == endpointId) {
+                    peer.copy(
+                        callsign = info.callsign.ifBlank { peer.callsign },
+                        latitude = info.latitude,
+                        longitude = info.longitude,
+                        lastSeen = System.currentTimeMillis()
+                    )
+                } else peer
+            }
+        }
     }
 }
