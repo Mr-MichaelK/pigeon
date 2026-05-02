@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+option java_package = "com.example.pigeon.proto";
+option java_multiple_files = true;
+option optimize_for = LITE_RUNTIME;
+
+enum EventType {
+  UNKNOWN_TYPE = 0; // Protobuf requires the first enum to be 0
+  FIRE = 1;
+  MEDICAL = 2;
+  INFRASTRUCTURE = 3;
+  RESOURCE = 4;
+  CUSTOM = 5;
+  SOS = 6;
+}
+
+message PigeonEvent {
+  string eventId = 1;
+  EventType eventType = 2;
+  string description = 3;
+  double latitude = 4;
+  double longitude = 5;
+  int64 timestamp = 6;
+  string creatorDeviceId = 7;
+  bool isResolved = 8;
+  string creatorName = 9;
+  string title = 10;
+  int64 expiryTimestamp = 11;
+  // X.509 SubjectPublicKeyInfo bytes of the creator's Ed25519 public key.
+  // Receivers must verify SHA-256(creator_public_key) == creatorDeviceId before
+  // trusting the signature — this binds the on-wire key to the claimed identity.
+  bytes creator_public_key = 12;
+  // Ed25519 signature over the serialized PigeonEvent with the signature field
+  // cleared. Any field tamper invalidates the signature.
+  bytes signature = 13;
+}
+
+message SyncItem {
+  string eventId = 1;
+  string eventHash = 2;
+}
+
+message SyncManifest {
+  repeated SyncItem items = 1;
+}
+
+message PigeonPayload {
+  oneof payload {
+    PigeonEvent event = 1;
+    SyncManifest manifest = 2;
+    VerificationMessage verification = 3;
+    PeerInfo peerInfo = 4;
+  }
+}
+
+// Sent over an established Nearby Connections link so the receiver can
+// place this peer on its radar at a real bearing/distance instead of a
+// hashed-ID placeholder. Sent on connect and whenever the sender's
+// fused-locked location moves past PEER_INFO_RESEND_MIN_M.
+message PeerInfo {
+  string callsign = 1;
+  double latitude = 2;
+  double longitude = 3;
+}
+
+message VerificationMessage {
+  string id = 1;
+  string event_id = 2;
+  string signer_id = 3;
+  bool is_confirm = 4;
+  int64 timestamp = 5;
+  // Same scheme as PigeonEvent.creator_public_key — receivers verify
+  // SHA-256(signer_public_key) == signer_id, then verify the signature.
+  bytes signer_public_key = 6;
+  // Ed25519 signature over the serialized VerificationMessage with the
+  // signature field cleared.
+  bytes signature = 7;
+}

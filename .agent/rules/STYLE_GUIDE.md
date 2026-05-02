@@ -2,11 +2,12 @@
 trigger: always_on
 ---
 
-# Pigeon Visual Standards
-* **Background:** #1C1C1C (Deep Charcoal/Tactical Black)
-* **Surface:** #2C2C2C (Gunmetal Grey)
-* **Primary (Incidents):** #E57373 (Soft Emergency Red)
-* **Secondary (Resources):** #81C784 (Tactical Green)
-* **Accent (Map/Identity):** #FFB74D (Warning Orange)
-* **Typography:** Bold, high-readability Sans-Serif (Roboto/Inter).
-* **Corners:** 8dp (Sharp/Rugged), not the bubbly 28dp defaults.
+# Pigeon Visual Standards (Stich UI Edition)
+* **Background:** #F8F7F6 (Tactical Sand / Bright Beige)
+* **Surface:** #FFFFFF (Paper White)
+* **Border:** #E5E2DC (Stone Grey / Tactical Border)
+* **Primary (Gold):** #DF9C20 (Operational Gold) - Used for Identity, Core Actions, and Highlights.
+* **Secondary (Status):** #16A34A (Mesh Active Green) / #E57373 (Soft Emergency Red).
+* **Typography:** Bold, high-readability Sans-Serif (Inter/Roboto). #171511 (Tactical Black) for primary, #877B64 (Dusty Beige) for secondary.
+* **Corners:** 12dp for Cards/Panels (Softer Modern Tactical), 8dp for Buttons/Inputs.
+* **Aesthetic:** High-contrast, card-based "Offline-Ready" utility look.

@@ -1,14 +1,31 @@
 ---
-description: A 3-stage agentic loop: Architect plans implementation in PLAN.md; Coder executes Kotlin/Compose code; Reviewer audits against STANDARDS.md for battery and architectural integrity.
+description: A workflow which architects a feature, codes it, and reviews the code to ensure it is clean and efficient.
 ---
 
-# Architect-Coder-Reviewer Workflow
+Role 1: The Architect
 
-## Step 1: Architectural Planning
-Prompt: "I am starting Task {{task_id}} from PROGRESS.md. Architect, please read SCREENS.md and ARCHITECTURE.md, then create a detailed technical PLAN.md in the root directory."
+    Trigger: User starts a new task (e.g., /architect-coder-reviewer Task 1.1).
 
-## Step 2: Implementation
-Prompt: "Plan approved. Coder, implement the changes specified in PLAN.md. Follow STANDARDS.md strictly. Ensure all new files are added to the git index."
+    Responsibility: Analyze architecture.md and screens.md.
 
-## Step 3: Peer Review
-Prompt: "Implementation complete. Reviewer, audit the code for battery efficiency, memory leaks, and adherence to the Clean Architecture defined in ARCHITECTURE.md. If issues are found, suggest fixes to the Coder. If clean, provide a summary of the files changed and instruct the user to commit and push."
+    Output: Create a file named PLAN.md in the project root. This plan must outline the files to be created/modified, the database schema (if applicable), and any logic patterns.
+
+    Next Step: Wait for user approval of PLAN.md.
+
+Role 2: The Coder
+
+    Trigger: User says "Plan approved" or "Proceed."
+
+    Responsibility: Implement the logic defined in PLAN.md.
+
+    Rules: Follow the "Stable Build" guidelines (Kotlin 2.0.21, Hilt, Room). Ensure imports are correct and match the libs.versions.toml catalog.
+
+    Output: The actual .kt files (Entities, DAOs, ViewModels, UI).
+
+Role 3: The Reviewer
+
+    Trigger: Coder finishes writing files.
+
+    Responsibility: Self-correcting. Check for common errors (missing @HiltViewModel, Room database export schemas, or missing @Inject constructors).
+
+    Output: A summary of the work completed and a request for the user to "Sync and Run."
