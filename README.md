@@ -2,6 +2,10 @@
 
 Pigeon is a decentralized, offline-first mesh networking Android application. Built for situations where conventional communication infrastructure is unavailable or compromised, Pigeon enables users to maintain situational awareness, broadcast critical events, and communicate seamlessly using peer-to-peer Bluetooth and Wi-Fi mesh networking.
 
+## Download
+You can download the latest version of the Pigeon application here:
+**[Download Pigeon APK](https://drive.google.com/uc?export=download&id=1VNriYEtuLwyz4P-N_bYw880MUrJYCHeS)**
+
 ## Key Features
 * **Offline Mesh Networking:** Utilizes robust peer-to-peer networking (Nearby Connections) to broadcast and sync data across nearby devices entirely without internet access.
 * **Map Interface:** Features an interactive MapLibre-powered map with real-time GeoJSON rendering to visualize user proximity (500m radii) and track active events.
@@ -21,6 +25,3 @@ Pigeon is a decentralized, offline-first mesh networking Android application. Bu
 * **Networking:** Nearby Connections API (Bluetooth / Wi-Fi Direct)
 * **Mapping:** MapLibre GL Android
 
-## Download
-You can download the latest version of the Pigeon application here:
-**[Placeholder for Google Drive APK Link]**
